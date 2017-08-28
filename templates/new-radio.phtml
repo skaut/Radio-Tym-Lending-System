@@ -1,0 +1,13 @@
+<h3>RTLS - Přidat nové radio</h3>
+
+<form method="POST" action="<?= $router->pathFor('add-new-radio'); ?>">
+	<label>ID rádia:
+		<input type="text" id="radioId" name="radioId"><br/>
+	</label>
+	<label>
+		Jméno: <input type="text" id="name" name="name"></label>
+	<br/>
+	<input type="submit" value="Přidat radio"><br/>
+</form>
+
+<p><a href="<?= $router->pathFor('radio-list'); ?>">Zpět na seznam radií</a></p>

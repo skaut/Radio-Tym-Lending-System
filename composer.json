@@ -1,0 +1,15 @@
+{
+  "name": "tomtomklima/rtls",
+  "description": "Radio Team Lending System for lending radios",
+  "license": "MIT",
+  "require": {
+	"slim/slim": "^3.0",
+    "monolog/monolog": "^1.23",
+    "slim/php-view": "^2.2"
+  },
+  "autoload": {
+	"psr-4": {
+	  "rtls\\": "src/"
+	}
+  }
+}
