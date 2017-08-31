@@ -73,31 +73,31 @@ $app->post('/add-new-radio', function (Request $request, Response $response) {
 	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('add-new-radio');
 
-$app->post('/lend-radio', function (Request $request, Response $response) {
+$app->post('/radio-action/{action}', function (Request $request, Response $response, $args) {
+	$argumentAction = htmlspecialchars($args['action'], ENT_QUOTES);
 	$parsedBody = $request->getParsedBody();
 	$id = htmlspecialchars($parsedBody['id'], ENT_QUOTES);
 	$radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
 	
-	$query = $this->db->prepare('UPDATE `radios` SET `status` = ? WHERE `id` = ?');
-	$query->execute(['lent', $id]);
-	
-	$this->logger->addInfo('Lent radio with ID '.$radioId);
+	$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-returned-time` = ? WHERE `id` = ?');
+	switch ($argumentAction) {
+		case 'lend':
+			$query->execute(['lent', date('Y-m-d H:i:s'), $id]);
+			//TODO add borrower into DB
+			break;
+		case 'return':
+			$query->execute(['charging', date('Y-m-d H:i:s'), $id]);
+			break;
+		case 'charged':
+			$query->execute(['ready', date('Y-m-d H:i:s'), $id]);
+			break;
+		default:
+			throw new Exception('Unknown action argument');
+	}
+	$this->logger->addInfo('Radio with ID '.$radioId.' has action '.$args['action']);
 	
 	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
-})->setName('lend-radio');
-
-$app->post('/return-radio', function (Request $request, Response $response) {
-	$parsedBody = $request->getParsedBody();
-	$id = htmlspecialchars($parsedBody['id'], ENT_QUOTES);
-	$radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
-	
-	$query = $this->db->prepare('UPDATE `radios` SET `status` = ? WHERE `id` = ?');
-	$query->execute(['returned', $id]);
-	
-	$this->logger->addInfo('Returned radio with ID '.$radioId);
-	
-	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
-})->setName('return-radio');
+})->setName('radio-action');
 
 $app->get('/log', function (Request $request, Response $response) {
 	$logData = file_get_contents('../logs/rtls.log');
@@ -114,23 +114,29 @@ $app->get('/', function (Request $request, Response $response) {
 		switch ($r['status']) {
 			case 'ready':
 				//lend available
-				$r['link'] = $this->router->pathFor('lend-radio');
+				$r['link'] = 'lend';
 				$r['linkLabel'] = 'Vypůjčit';
 				break;
 			case 'lent':
 				//return available
-				$r['link'] = $this->router->pathFor('return-radio');
+				$r['link'] = 'return';
 				$r['linkLabel'] = 'Vrátit';
 				break;
-			case 'returned':
+			case 'charging':
 				//lend available (but with exceptions?)
-				$r['link'] = $this->router->pathFor('lend-radio');
+				$r['link'] = 'lend';
 				$r['linkLabel'] = 'Vypůjčit (nenabito!)';
 				break;
 		}
 	}
 	
-	return $response = $this->view->render($response, 'radio-list.phtml', ['router' => $this->router, 'radios' => $radios]);
+	$statusDictionary = [
+		'lent' => 'Vypůjčeno',
+		'charging' => 'Nabíjí se',
+		'ready' => 'Připraveno',
+	];
+	
+	return $response = $this->view->render($response, 'radio-list.phtml', ['router' => $this->router, 'radios' => $radios, 'statusDictionary' => $statusDictionary]);
 })->setName('radio-list');
 
 
