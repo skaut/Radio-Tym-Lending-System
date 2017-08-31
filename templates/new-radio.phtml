@@ -1,13 +1,17 @@
-<h3>RTLS - Přidat nové radio</h3>
+<?php require 'prefix.phtml' ?>
 
-<form method="POST" action="<?= $router->pathFor('add-new-radio'); ?>">
-	<label>ID rádia:
-		<input type="text" id="radioId" name="radioId"><br/>
-	</label>
-	<label>
-		Jméno: <input type="text" id="name" name="name"></label>
-	<br/>
-	<input type="submit" value="Přidat radio"><br/>
-</form>
+	<h2>RTLS - Přidat nové radio</h2>
 
-<p><a href="<?= $router->pathFor('radio-list'); ?>">Zpět na seznam radií</a></p>
+<?php require 'mainMenu.phtml' ?>
+
+	<article>
+		<h4>Přidat rádio: </h4>
+		<form method="POST" action="<?= $router->pathFor('add-new-radio'); ?>">
+			<input type="text" id="radioId" name="radioId" placeholder="ID rádia" required>
+			<input type="text" id="name" name="name" placeholder="Název" required>
+			<input type="submit" class="pure-button pure-button-primary" value="Přidat radio">
+			
+		</form>
+	</article>
+
+<?php require 'suffix.phtml' ?>

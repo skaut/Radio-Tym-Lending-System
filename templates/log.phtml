@@ -1,0 +1,14 @@
+<?php require 'prefix.phtml' ?>
+
+	<h2>RTLS - Log událostí</h2>
+
+<?php require 'mainMenu.phtml' ?>
+
+	<article>
+		<h4>Log </h4>
+		<?php foreach ($log as $l) : ?>
+			<?= $l ?><br/>
+		<?php endforeach; ?>
+	</article>
+
+<?php require 'suffix.phtml' ?>

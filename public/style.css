@@ -1,0 +1,18 @@
+body {
+	margin: 0 auto;
+	width: 90%
+}
+
+footer {
+	margin-top: 14px;
+	font-size: 12px;
+}
+
+.menu {
+	background-color: #333333;
+	width: auto;
+}
+
+.table {
+	width: 100%;
+}
