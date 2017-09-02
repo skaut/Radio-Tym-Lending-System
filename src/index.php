@@ -111,7 +111,7 @@ $app->get('/log', function (Request $request, Response $response) {
 
 $app->get('/', function (Request $request, Response $response) {
 	//get items from DB
-	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, "last-action-time", `last-borrower` FROM `radios`');
+	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, `last-action-time`, `last-borrower` FROM `radios` ORDER BY `status`="ready" DESC, status="charging" DESC, status="lent" DESC, `last-action-time` ASC');
 	$radios = $query->fetchAll();
 	$formTemplatesDirectory = 'radio-list-form-templates/';
 	
