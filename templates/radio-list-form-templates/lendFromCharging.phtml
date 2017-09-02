@@ -1,0 +1,6 @@
+<form action="<?= $router->pathFor('radio-action', ['action' => 'lend']) ?>" method="POST">
+	<input type="text" name="borrower" placeholder="Vypůjčitel" autofocus required>
+	<input type="hidden" name="id" value="<?= $r['id'] ?>">
+	<input type="hidden" name="radioId" value="<?= $r['radioId'] ?>">
+	<input type="submit" class="pure-button" value="Vypůjčit (nenabito!)">
+</form>

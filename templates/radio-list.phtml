@@ -27,12 +27,7 @@
 					<td><?= $r['last-returned-time'] ?></td>
 					<td><?= $r['last-borrower'] ?></td>
 					<td>
-						<form action="<?= $router->pathFor('radio-action', ['action' => $r['link']]) ?>" method="POST">
-							<!-- TODO překopat, kde se toto bere - třeba snippety? nebo switch podle akce? -->
-							<input type="hidden" name="id" value="<?= $r['id'] ?>">
-							<input type="hidden" name="radioId" value="<?= $r['radioId'] ?>">
-							<input type="submit" class="pure-button" value="<?= $r['linkLabel'] ?>">
-						</form>
+						<?php require ($r['formTemplateLink']); ?>
 					</td>
 				</tr>
 			<?php endforeach ?>

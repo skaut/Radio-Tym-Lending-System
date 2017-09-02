@@ -1,0 +1,5 @@
+<form action="<?= $router->pathFor('radio-action', ['action' => 'return']) ?>" method="POST">
+	<input type="hidden" name="id" value="<?= $r['id'] ?>">
+	<input type="hidden" name="radioId" value="<?= $r['radioId'] ?>">
+	<input type="submit" class="pure-button" value="Vrátit">
+</form>

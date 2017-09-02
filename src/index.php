@@ -59,7 +59,7 @@ $app->get('/new-radio', function (Request $request, Response $response) {
 $app->post('/add-new-radio', function (Request $request, Response $response) {
 	$parsedBody = $request->getParsedBody();
 	
-	$query = $this->db->prepare('INSERT INTO `radios` (`radioId`, `name`, `status`, `last-returned-time`, `last-borrower`) VALUES (?, ?, ?, ?, ?)');
+	$query = $this->db->prepare('INSERT INTO `radios` (`radioId`, `name`, `status`, "last-action-time", `last-borrower`) VALUES (?, ?, ?, ?, ?)');
 	$query->execute([
 			htmlspecialchars($parsedBody['radioId'], ENT_QUOTES),
 			htmlspecialchars($parsedBody['name'], ENT_QUOTES),
@@ -79,22 +79,26 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
 	$id = htmlspecialchars($parsedBody['id'], ENT_QUOTES);
 	$radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
 	
-	$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-returned-time` = ? WHERE `id` = ?');
 	switch ($argumentAction) {
 		case 'lend':
-			$query->execute(['lent', date('Y-m-d H:i:s'), $id]);
-			//TODO add borrower into DB
+			$borrower = htmlspecialchars($parsedBody['borrower'], ENT_QUOTES);
+			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, "last-action-time" = ?, `last-borrower` = ? WHERE `id` = ?');
+			$query->execute(['lent', date('Y-m-d H:i:s'), $borrower, $id]);
+			$this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.');
 			break;
 		case 'return':
+			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, "last-action-time" = ? WHERE `id` = ?');
 			$query->execute(['charging', date('Y-m-d H:i:s'), $id]);
+			$this->logger->addInfo('Radio with ID '.$radioId.' is returned.');
 			break;
 		case 'charged':
+			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, "last-action-time" = ? WHERE `id` = ?');
 			$query->execute(['ready', date('Y-m-d H:i:s'), $id]);
+			$this->logger->addInfo('Radio with ID '.$radioId.' is set as fully charged.');
 			break;
 		default:
-			throw new Exception('Unknown action argument');
+			throw new Exception('Unknown radio-action argument');
 	}
-	$this->logger->addInfo('Radio with ID '.$radioId.' has action '.$args['action']);
 	
 	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('radio-action');
@@ -107,25 +111,24 @@ $app->get('/log', function (Request $request, Response $response) {
 
 $app->get('/', function (Request $request, Response $response) {
 	//get items from DB
-	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, `last-returned-time`, `last-borrower` FROM `radios`');
+	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, "last-action-time", `last-borrower` FROM `radios`');
 	$radios = $query->fetchAll();
+	$formTemplatesDirectory = 'radio-list-form-templates/';
+	
 	//get right link based by status
 	foreach ($radios as &$r) {
 		switch ($r['status']) {
 			case 'ready':
 				//lend available
-				$r['link'] = 'lend';
-				$r['linkLabel'] = 'Vypůjčit';
+				$r['formTemplateLink'] = $formTemplatesDirectory.'lend.phtml';
 				break;
 			case 'lent':
 				//return available
-				$r['link'] = 'return';
-				$r['linkLabel'] = 'Vrátit';
+				$r['formTemplateLink'] = $formTemplatesDirectory.'return.phtml';
 				break;
 			case 'charging':
-				//lend available (but with exceptions?)
-				$r['link'] = 'lend';
-				$r['linkLabel'] = 'Vypůjčit (nenabito!)';
+				//lend available (but with alert)
+				$r['formTemplateLink'] = $formTemplatesDirectory.'lendFromCharging.phtml';
 				break;
 		}
 	}
