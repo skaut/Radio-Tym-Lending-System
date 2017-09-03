@@ -23,11 +23,25 @@
 				<tr>
 					<td><?= $r['radioId'] ?></td>
 					<td><?= $r['name'] ?></td>
-					<td><?= $statusDictionary[$r['status']] ?></td>
+					<td>
+						<div id="status_<?= $r['id'] ?>">
+							<?= $statusDictionary[$r['status']] ?>
+						</div>
+						<div id="timer_<?= $r['id'] ?>"></div>
+						<?php if ($r['status'] == 'charging') : ?>
+							<?php $showTime = max(0, strtotime($r['last-action-time'].'+ 8 hours') - strtotime('now')) ?>
+							<script type="text/javascript" src="../public/timer.js"></script>
+							<script>
+								var timerDisplay = document.querySelector('#timer_<?= $r['id'] ?>');
+								var statusDisplay = document.querySelector('#status_<?= $r['id'] ?>');
+								startTimer(<?= $showTime; ?>, timerDisplay, statusDisplay);
+							</script>
+						<?php endif ?>
+					</td>
 					<td><?= $r['last-action-time'] ?></td>
 					<td><?= $r['last-borrower'] ?></td>
 					<td>
-						<?php require ($r['formTemplateLink']); ?>
+						<?php require($r['formTemplateLink']); ?>
 					</td>
 				</tr>
 			<?php endforeach ?>

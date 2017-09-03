@@ -10,3 +10,6 @@
 [2017-09-02 16:59:19] fileLogger.INFO: Radio with ID A7 has action return [] []
 [2017-09-02 16:59:20] fileLogger.INFO: Radio with ID C8 has action return [] []
 [2017-09-02 18:10:20] fileLogger.INFO: Radio with ID A7 is lent to Sam. [] []
+[2017-09-03 22:18:57] fileLogger.INFO: Radio with ID C8 is lent to j. [] []
+[2017-09-03 22:39:04] fileLogger.INFO: Radio with ID A7 is returned. [] []
+[2017-09-03 22:52:59] fileLogger.INFO: Radio with ID A4 is automaticly set as charged and ready. [] []

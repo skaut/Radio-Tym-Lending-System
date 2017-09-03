@@ -127,8 +127,17 @@ $app->get('/', function (Request $request, Response $response) {
 				$r['formTemplateLink'] = $formTemplatesDirectory.'return.phtml';
 				break;
 			case 'charging':
-				//lend available (but with alert)
-				$r['formTemplateLink'] = $formTemplatesDirectory.'lendFromCharging.phtml';
+				//lend available (but with alert) - or change status to ready
+				if (strtotime($r['last-action-time'].'+ 8 hours') - strtotime('now') <= 0) {
+					//charged
+					$query = $this->db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `id` = ?');
+					$query->execute([$r['id']]);
+					$this->logger->addInfo('Radio with ID '.$r['radioId'].' is automaticly set as charged and ready.');
+					
+					$r['formTemplateLink'] = $formTemplatesDirectory.'lend.phtml';
+				} else {
+					$r['formTemplateLink'] = $formTemplatesDirectory.'lendFromCharging.phtml';
+				}
 				break;
 		}
 	}
@@ -136,7 +145,7 @@ $app->get('/', function (Request $request, Response $response) {
 	$statusDictionary = [
 		'lent' => 'Vypůjčeno',
 		'charging' => 'Nabíjí se',
-		'ready' => 'Připraveno',
+		'ready' => 'Ready',
 	];
 	
 	return $response = $this->view->render($response, 'radio-list.phtml', ['router' => $this->router, 'radios' => $radios, 'statusDictionary' => $statusDictionary]);
