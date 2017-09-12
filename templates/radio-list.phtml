@@ -27,7 +27,11 @@
 						<div id="status_<?= $r['id'] ?>">
 							<?= $statusDictionary[$r['status']] ?>
 						</div>
-						<div id="timer_<?= $r['id'] ?>"></div>
+						<div id="timer_<?= $r['id'] ?>">
+							<?php if ($r['status'] == 'charging') : ?>
+								00:00:00
+							<?php endif ?>
+						</div>
 						<?php if ($r['status'] == 'charging') : ?>
 							<?php $showTime = max(0, strtotime($r['last-action-time'].'+ 8 hours') - strtotime('now')) ?>
 							<script type="text/javascript" src="../public/timer.js"></script>

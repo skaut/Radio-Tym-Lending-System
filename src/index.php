@@ -132,7 +132,7 @@ $app->get('/', function (Request $request, Response $response) {
 					//charged
 					$query = $this->db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `id` = ?');
 					$query->execute([$r['id']]);
-					$this->logger->addInfo('Radio with ID '.$r['radioId'].' is automaticly set as charged and ready.');
+					$this->logger->addInfo('Radio with ID '.$r['radioId'].' is set as charged and ready.');
 					
 					$r['formTemplateLink'] = $formTemplatesDirectory.'lend.phtml';
 				} else {
