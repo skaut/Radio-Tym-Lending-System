@@ -10,6 +10,8 @@
 
 navštívit URL `[server]/rtls/src`, popř. nasměrovat vrituál do této složky
 
+Nastavit permissions `rtls.sqlite` writable pro nginx.
+
 ## Use
 
 Menu nahoře nabízí přehled všech vypůjčených rádií, přidání nového stroje a pohled do celkového logu.
@@ -22,3 +24,14 @@ Online demo na webu výše
 **Server** - jde použít Nginx nebo Apache2 (potom je dobré nastavit virtuální složku do projektové složky `src/`, aby přístup do aplikace měl hezkou URL.
 
 Lze také použít vestavěný PHP server spuštěním příkazu `$ php -S localhost:8000` se žádaným portem, potom ale aplikace nebude přístupná online (vhodné pro řešení na jednom PC, protože se potom nemusí řešit online zabezpečení).
+
+### nginx config
+
+Součástí repa je `.htaccess` file pro Apache, který není nginxem interpretován. Je třeba napsat si přepsání URL takto:
+```
+  location / {
+    # ..
+    try_files $uri $uri/ /src/index.php$args;
+    # ..
+  }
+```
