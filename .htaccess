@@ -1,4 +1,12 @@
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
+
+# blacklist all sensitive extensions
+<Files ~ "\.(sql|sqlite|db|log)$">
+   order deny,allow
+   deny from all
+</Files>
+
+CGIPassAuth On
 RewriteRule ^ src/index.php [QSA,L]

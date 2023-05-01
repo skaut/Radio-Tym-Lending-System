@@ -11,6 +11,9 @@ require '../vendor/autoload.php';
 $config['displayErrorDetails'] = true;
 $config['addContentLengthHeader'] = false;
 $config['db']['sqliteDbName'] = 'rtls.sqlite';
+$config['auth'] = [
+    'radio' => 'radio',
+];
 
 $app = new \Slim\App(['settings' => $config]);
 $container = $app->getContainer();
@@ -36,15 +39,13 @@ $container['db'] = function ($c) {
 
 $container['view'] = new \Slim\Views\PhpRenderer("../templates/");
 
-
 // MIDDLEWARE
-
-$app->add(function (Request $request, Response $response, $next) {
-	$response = $next($request, $response);
-	
-	return $response;
-});
-
+// AUTH
+$app->add(new Tuupola\Middleware\HttpBasicAuthentication([
+    "users" => [
+        "radio" => "radio",
+    ]
+]));
 
 // ROUTES
 
@@ -106,7 +107,7 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
 $app->get('/log', function (Request $request, Response $response) {
 	$logData = file_get_contents('../logs/rtls.log');
 	
-	return $response = $this->view->render($response, 'log.phtml', ['router' => $this->router, 'log' => explode(PHP_EOL, $logData)]);
+	return $this->view->render($response, 'log.phtml', ['router' => $this->router, 'log' => explode(PHP_EOL, $logData)]);
 })->setName('log');
 
 $app->get('/', function (Request $request, Response $response) {
@@ -148,7 +149,7 @@ $app->get('/', function (Request $request, Response $response) {
 		'ready' => 'Ready',
 	];
 	
-	return $response = $this->view->render($response, 'radio-list.phtml', ['router' => $this->router, 'radios' => $radios, 'statusDictionary' => $statusDictionary]);
+	return $this->view->render($response, 'radio-list.phtml', ['router' => $this->router, 'radios' => $radios, 'statusDictionary' => $statusDictionary]);
 })->setName('radio-list');
 
 
