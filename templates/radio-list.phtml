@@ -2,11 +2,14 @@
 
 	<h2>RTLS - Seznam rádií</h2>
 
-<?php require 'mainMenu.phtml' ?>
+<?php require 'main-menu.phtml' ?>
 
 	<article>
 		<br/>
-		<table class="table pure-table pure-table-striped">
+		<script type="text/javascript" src="../public/filter.js"></script>
+		Filtrování vysílaček: <input id="inputFilter" type="text" placeholder="zkus Šutr, M403..." onkeyup="filterInput()"><br/>
+		<br/>
+		<table id="mainTable" class="table pure-table pure-table-striped">
 			<thead>
 			<tr>
 				<th>Radio ID</th>
@@ -33,7 +36,7 @@
 							<?php endif ?>
 						</div>
 						<?php if ($r['status'] == 'charging') : ?>
-							<?php $showTime = max(0, strtotime($r['last-action-time'].'+ 8 hours') - strtotime('now')) ?>
+							<?php $showTime = max(0, strtotime($r['last-action-time'].'+ 2 hours') - strtotime('now')) ?>
 							<script type="text/javascript" src="../public/timer.js"></script>
 							<script>
 								var timerDisplay = document.querySelector('#timer_<?= $r['id'] ?>');
@@ -42,7 +45,7 @@
 							</script>
 						<?php endif ?>
 					</td>
-					<td><?= $r['last-action-time'] ?></td>
+					<td><?= date_create($r['last-action-time'])->format('H:i:s d/m/y') ?></td>
 					<td><?= $r['last-borrower'] ?></td>
 					<td>
 						<?php require($r['formTemplateLink']); ?>
