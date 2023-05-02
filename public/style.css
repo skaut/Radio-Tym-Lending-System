@@ -40,3 +40,7 @@ footer {
 .pure-button {
 	margin: 0;
 }
+
+.right {
+	float: right;
+}

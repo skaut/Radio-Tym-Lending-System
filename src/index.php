@@ -166,11 +166,15 @@ $app->get('/', function (Request $request, Response $response) {
 		'charging' => 'Nabíjí se',
 		'ready' => 'Ready',
 	];
-	
-	return $this->view->render($response, 'radio-list.phtml', [
+
+    return $this->view->render($response, 'radio-list.phtml', [
         'router' => $this->router,
         'radios' => $radios,
         'channels' => $channels,
+        'radioCounts' => [
+            'lent' => $this->db->query('SELECT COUNT(`id`) as count FROM `radios` WHERE status = "lent"')->fetch()['count'],
+            'notLent' => $this->db->query('SELECT COUNT(`id`) as count  FROM `radios` WHERE status = "ready" OR status = "charging"')->fetch()['count'],
+        ],
         'statusDictionary' => $statusDictionary,
     ]);
 })->setName('radio-list');
