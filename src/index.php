@@ -3,7 +3,8 @@
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 
-require '../vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/utils.php';
 
 
 // CONFIGURATION
@@ -23,7 +24,7 @@ $container = $app->getContainer();
 
 $container['logger'] = function ($c) {
 	$logger = new \Monolog\Logger('fileLogger');
-	$file_handler = new \Monolog\Handler\StreamHandler("../logs/rtls.log");
+	$file_handler = new \Monolog\Handler\StreamHandler('../logs/rtls.log');
 	$logger->pushHandler($file_handler);
 	return $logger;
 };
@@ -37,13 +38,13 @@ $container['db'] = function ($c) {
 	return $pdo;
 };
 
-$container['view'] = new \Slim\Views\PhpRenderer("../templates/");
+$container['view'] = new \Slim\Views\PhpRenderer('../templates/');
 
 // MIDDLEWARE
 // AUTH
 $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
-    "users" => [
-        "radio" => "radio",
+    'users' => [
+        'radio' => 'radio',
     ]
 ]));
 
@@ -60,7 +61,7 @@ $app->get('/new-radio', function (Request $request, Response $response) {
 $app->post('/add-new-radio', function (Request $request, Response $response) {
 	$parsedBody = $request->getParsedBody();
 	
-	$query = $this->db->prepare('INSERT INTO `radios` (`radioId`, `name`, `status`, "last-action-time", `last-borrower`) VALUES (?, ?, ?, ?, ?)');
+	$query = $this->db->prepare('INSERT INTO `radios` (`radioId`, `name`, `status`, `last-action-time`, `last-borrower`) VALUES (?, ?, ?, ?, ?)');
 	$query->execute([
 			htmlspecialchars($parsedBody['radioId'], ENT_QUOTES),
 			htmlspecialchars($parsedBody['name'], ENT_QUOTES),
@@ -79,22 +80,22 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
 	$parsedBody = $request->getParsedBody();
 	$id = htmlspecialchars($parsedBody['id'], ENT_QUOTES);
 	$radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
-	
-	switch ($argumentAction) {
+
+    switch ($argumentAction) {
 		case 'lend':
 			$borrower = htmlspecialchars($parsedBody['borrower'], ENT_QUOTES);
-			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, "last-action-time" = ?, `last-borrower` = ? WHERE `id` = ?');
-			$query->execute(['lent', date('Y-m-d H:i:s'), $borrower, $id]);
+			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ?, `last-borrower` = ? WHERE `id` = ?');
+			$query->execute(['lent', getNow(), $borrower, $id]);
 			$this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.');
 			break;
 		case 'return':
-			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, "last-action-time" = ? WHERE `id` = ?');
-			$query->execute(['charging', date('Y-m-d H:i:s'), $id]);
+			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ? WHERE `id` = ?');
+			$query->execute(['charging', getNow(), $id]);
 			$this->logger->addInfo('Radio with ID '.$radioId.' is returned.');
 			break;
 		case 'charged':
-			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, "last-action-time" = ? WHERE `id` = ?');
-			$query->execute(['ready', date('Y-m-d H:i:s'), $id]);
+			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ? WHERE `id` = ?');
+			$query->execute(['ready', getNow(), $id]);
 			$this->logger->addInfo('Radio with ID '.$radioId.' is set as fully charged.');
 			break;
 		default:
@@ -142,6 +143,7 @@ $app->get('/', function (Request $request, Response $response) {
 				break;
 		}
 	}
+    unset($r);
 	
 	$statusDictionary = [
 		'lent' => 'Vypůjčeno',
@@ -154,4 +156,9 @@ $app->get('/', function (Request $request, Response $response) {
 
 
 // FIRE!
-$app->run();
+try {
+    $app->run();
+} catch (Throwable $e) {
+    echo 'Pardon, radio ztratilo spojení...';
+    die;
+}

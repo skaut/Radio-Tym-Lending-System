@@ -1,7 +1,7 @@
 function startTimer(duration, timerDisplay, statusDisplay) {
-	var timer = duration, hours, minutes, seconds;
-	var interval = setInterval(function () {
-		hours = parseInt(timer / (60*60), 10);
+	let timer = duration, hours, minutes, seconds;
+	let interval = setInterval(function () {
+		hours = parseInt(timer / (60 * 60), 10);
 		minutes = parseInt((timer - (hours * 60 * 60)) / 60, 10);
 		seconds = parseInt(timer % 60, 10);
 
@@ -12,7 +12,6 @@ function startTimer(duration, timerDisplay, statusDisplay) {
 		timerDisplay.textContent = hours + ":" + minutes + ":" + seconds;
 
 		if (--timer < 0) {
-			//timer = 0; // unpleasant, but working solution
 			clearInterval(interval); // cleaner solution (:
 
 			timerDisplay.textContent = '';

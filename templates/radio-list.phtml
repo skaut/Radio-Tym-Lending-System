@@ -36,7 +36,7 @@
 							<?php endif ?>
 						</div>
 						<?php if ($r['status'] == 'charging') : ?>
-							<?php $showTime = max(0, strtotime($r['last-action-time'].'+ 2 hours') - strtotime('now')) ?>
+							<?php $showTime = max(0, strtotime($r['last-action-time'].'+ 2 hours') - strtotime(getNow())) ?>
 							<script type="text/javascript" src="../public/timer.js"></script>
 							<script>
 								var timerDisplay = document.querySelector('#timer_<?= $r['id'] ?>');
