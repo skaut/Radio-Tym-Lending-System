@@ -86,6 +86,10 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
     switch ($argumentAction) {
 		case 'lend':
 			$borrower = htmlspecialchars($parsedBody['borrower'], ENT_QUOTES);
+			$lastBorrower = htmlspecialchars($parsedBody['last-borrower'], ENT_QUOTES);
+            if (empty($borrower) && !empty($lastBorrower)) {
+                $borrower = $lastBorrower;
+            }
 			$query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ?, `last-borrower` = ? WHERE `id` = ?');
 			$query->execute(['lent', getNow(), $borrower, $id]);
 			$this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.');
@@ -132,16 +136,11 @@ $app->get('/', function (Request $request, Response $response) {
 				break;
 			case 'charging':
 				//lend available (but with alert) - or change status to ready
-				if (strtotime($r['last-action-time'].'+ 2 hours') - strtotime(getNow()) <= 0) {
-					//charged
-					$query = $this->db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `id` = ?');
-					$query->execute([$r['id']]);
-					$this->logger->addInfo('Radio with ID '.$r['radioId'].' is set as charged and ready.');
-					
-					$r['formTemplateLink'] = $formTemplatesDirectory.'lend.phtml';
-				} else {
-					$r['formTemplateLink'] = $formTemplatesDirectory.'lendFromCharging.phtml';
-				}
+                $query = $this->db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `id` = ?');
+                $query->execute([$r['id']]);
+                $this->logger->addInfo('Radio with ID '.$r['radioId'].' is set as charged and ready.');
+                
+                $r['formTemplateLink'] = $formTemplatesDirectory.'lend.phtml';
 				break;
 		}
 	}
