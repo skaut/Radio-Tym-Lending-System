@@ -9,10 +9,34 @@ footer {
 }
 
 .menu {
-	background-color: #333333;
+	background-color: #333;
 	width: auto;
+}
+
+.pure-button {
+	background-color: #333;
+}
+
+.pure-button:hover {
+	background-color: #eee;
+}
+
+.pure-menu-link, .pure-button {
+	color: #eee;
+}
+
+.pure-menu-link:hover,  .pure-button:hover {
+	color: #333;
 }
 
 .table {
 	width: 100%;
+}
+
+.pure-table td {
+	padding: 0.1em 0.4em;
+}
+
+.pure-button {
+	margin: 0;
 }
