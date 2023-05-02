@@ -46,7 +46,7 @@
 						<?php endif ?>
 					</td>
 					<td><?= date_create($r['last-action-time'])->format('H:i:s d/m/y') ?></td>
-					<td><?= $r['last-borrower'] ?></td>
+					<td><?= $r['last-borrower'] ?><!-- <?= removeDiacritic($r['last-borrower']) ?> --></td>
 					<td>
 						<?php require($r['formTemplateLink']); ?>
 					</td>
