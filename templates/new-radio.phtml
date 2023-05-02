@@ -12,6 +12,14 @@
 			<input type="submit" class="pure-button pure-button-primary" value="Přidat radio">
 			
 		</form>
+		<br/>
+		<h4>Hromadný import: </h4>
+		<form method="POST" action="<?= $router->pathFor('import-radio'); ?>">
+			<textarea name="importRadio" rows="15" cols="60">AA1;Baofeng
+AA2;Baofeng</textarea><br/>
+			<br/>
+			<input type="submit" value="Importovat" class="pure-button">
+		</form>
 	</article>
 
 <?php require 'suffix.phtml' ?>

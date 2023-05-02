@@ -57,7 +57,7 @@ $app->get('/phpinfo', function (Request $request, Response $response) {
 });
 
 $app->get('/new-radio', function (Request $request, Response $response) {
-	return $response = $this->view->render($response, 'new-radio.phtml', ['router' => $this->router]);
+	return $this->view->render($response, 'new-radio.phtml', ['router' => $this->router]);
 })->setName('new-radio');
 
 $app->post('/add-new-radio', function (Request $request, Response $response) {
@@ -68,7 +68,7 @@ $app->post('/add-new-radio', function (Request $request, Response $response) {
 			htmlspecialchars($parsedBody['radioId'], ENT_QUOTES),
 			htmlspecialchars($parsedBody['name'], ENT_QUOTES),
 			'ready',
-			date('Y-m-d H:i:s'),
+            getNow(),
 			NULL,
 		]
 	);
@@ -76,6 +76,26 @@ $app->post('/add-new-radio', function (Request $request, Response $response) {
 	
 	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('add-new-radio');
+
+$app->post('/import-radio', function (Request $request, Response $response) {
+	$importRadio = $request->getParsedBody()['importRadio'];
+    $explodedImportRadio = explode(PHP_EOL, $importRadio);
+
+    foreach ($explodedImportRadio as $singleRadio) {
+        $radioData = explode(';', $singleRadio);
+        $query = $this->db->prepare('INSERT INTO `radios` (`radioId`, `name`, `status`, `last-action-time`, `last-borrower`) VALUES (?, ?, ?, ?, ?)');
+        $query->execute([
+            trim(htmlspecialchars($radioData[0], ENT_QUOTES)),
+            trim(htmlspecialchars($radioData[1], ENT_QUOTES)),
+            'ready',
+            getNow(),
+            NULL,
+        ]);
+        $this->logger->addInfo('Added radio from import with ID '.htmlspecialchars($importRadio['radioId'], ENT_QUOTES));
+    }
+
+	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
+})->setName('import-radio');
 
 $app->post('/update-channel', function (Request $request, Response $response) {
 	$parsedBody = $request->getParsedBody();
