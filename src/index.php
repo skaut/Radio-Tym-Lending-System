@@ -6,15 +6,17 @@ use \Psr\Http\Message\ResponseInterface as Response;
 require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/utils.php';
 
+// LOAD ENVS
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__.'/../');
+$dotenv->load();
+
 
 // CONFIGURATION
 
 $config['displayErrorDetails'] = true;
 $config['addContentLengthHeader'] = false;
 $config['db']['sqliteDbName'] = 'rtls.sqlite';
-$config['auth'] = [
-    'radio' => 'radio',
-];
 
 $app = new \Slim\App(['settings' => $config]);
 $container = $app->getContainer();
@@ -44,7 +46,7 @@ $container['view'] = new \Slim\Views\PhpRenderer('../templates/');
 // AUTH
 $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
     'users' => [
-        'radio' => 'radio',
+        $_ENV['AUTH_USER'] => $_ENV['AUTH_PASS'],
     ]
 ]));
 
@@ -130,7 +132,7 @@ $app->get('/', function (Request $request, Response $response) {
 				break;
 			case 'charging':
 				//lend available (but with alert) - or change status to ready
-				if (strtotime($r['last-action-time'].'+ 8 hours') - strtotime('now') <= 0) {
+				if (strtotime($r['last-action-time'].'+ 2 hours') - strtotime(getNow()) <= 0) {
 					//charged
 					$query = $this->db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `id` = ?');
 					$query->execute([$r['id']]);
