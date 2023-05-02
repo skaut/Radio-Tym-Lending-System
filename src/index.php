@@ -77,6 +77,19 @@ $app->post('/add-new-radio', function (Request $request, Response $response) {
 	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('add-new-radio');
 
+$app->post('/update-channel', function (Request $request, Response $response) {
+	$parsedBody = $request->getParsedBody();
+	$query = $this->db->prepare('UPDATE `radios` SET `channel` = ? WHERE `id` = ?');
+	$query->execute([
+            htmlspecialchars($parsedBody['channel'], ENT_QUOTES),
+            htmlspecialchars($parsedBody['radioId'], ENT_QUOTES),
+		]
+	);
+	$this->logger->addInfo('Changed channel for radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
+
+	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
+})->setName('update-channel');
+
 $app->post('/radio-action/{action}', function (Request $request, Response $response, $args) {
 	$argumentAction = htmlspecialchars($args['action'], ENT_QUOTES);
 	$parsedBody = $request->getParsedBody();
@@ -119,7 +132,7 @@ $app->get('/log', function (Request $request, Response $response) {
 
 $app->get('/', function (Request $request, Response $response) {
 	//get items from DB
-	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, `last-action-time`, `last-borrower` FROM `radios` ORDER BY `status`="ready" DESC, status="charging" DESC, status="lent" DESC, `last-action-time` ASC');
+	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, `last-action-time`, `channel`, `last-borrower` FROM `radios` ORDER BY `status`="ready" DESC, status="charging" DESC, status="lent" DESC, `last-action-time` ASC');
 	$radios = $query->fetchAll();
 	$formTemplatesDirectory = 'radio-list-form-templates/';
 	
@@ -145,6 +158,8 @@ $app->get('/', function (Request $request, Response $response) {
 		}
 	}
     unset($r);
+
+    $channels = range(1, 16);
 	
 	$statusDictionary = [
 		'lent' => 'Vypůjčeno',
@@ -152,7 +167,12 @@ $app->get('/', function (Request $request, Response $response) {
 		'ready' => 'Ready',
 	];
 	
-	return $this->view->render($response, 'radio-list.phtml', ['router' => $this->router, 'radios' => $radios, 'statusDictionary' => $statusDictionary]);
+	return $this->view->render($response, 'radio-list.phtml', [
+        'router' => $this->router,
+        'radios' => $radios,
+        'channels' => $channels,
+        'statusDictionary' => $statusDictionary,
+    ]);
 })->setName('radio-list');
 
 

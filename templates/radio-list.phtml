@@ -16,6 +16,7 @@
 				<th>Název</th>
 				<th>Stav</th>
 				<th>Čas poslední akce</th>
+				<th>Kanál</th>
 				<th>Poslední vypůjčitel</th>
 				<th>Akce</th>
 			</tr>
@@ -46,6 +47,18 @@
 						<?php endif ?>
 					</td>
 					<td><?= date_create($r['last-action-time'])->format('H:i:s d/m/y') ?></td>
+					<td>
+						<form method="POST" action="<?= $router->pathFor('update-channel'); ?>">
+							<select name="channel" required="required" onchange="this.form.submit();">
+								<?php foreach($channels as $channel): ?>
+									<option value="<?= $channel ?>" <?php if ($r['channel'] === (string)$channel) echo 'selected="selected"'; ?>>
+										<?= $channel ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+							<input type="hidden" name="radioId" value="<?= $r['id'] ?>">
+						</form>
+					</td>
 					<td><?= $r['last-borrower'] ?><!-- <?= removeDiacritic($r['last-borrower']) ?> --></td>
 					<td>
 						<?php require($r['formTemplateLink']); ?>

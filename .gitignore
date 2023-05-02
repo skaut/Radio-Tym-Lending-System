@@ -1,5 +1,5 @@
 vendor/*
 .idea/*
 logs/*
-src/rtls.sqlite
+src/*.sqlite
 .env
