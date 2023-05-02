@@ -2,6 +2,14 @@
 <html>
 <head>
 	<link rel="stylesheet" href="../public/pure-min.css">
+	<title>
+    		<?php
+      			$sql = "SELECT * from List";
+      			if ($result = mysqli_query($connection, $sql)) {
+      			$rowcount = mysqli_num_rows( $result );
+      			printf("(%d) Rádia NSJ2023", $rowcount);
+    			}
+  		?>
 	<link rel="stylesheet" href="../public/style.css">
 </head>
 	<body>
