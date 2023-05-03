@@ -83,14 +83,18 @@ $app->post('/import-radio', function (Request $request, Response $response) {
 
     foreach ($explodedImportRadio as $singleRadio) {
         $radioData = explode(';', $singleRadio);
+        
         $query = $this->db->prepare('INSERT INTO `radios` (`radioId`, `name`, `status`, `last-action-time`, `last-borrower`) VALUES (?, ?, ?, ?, ?)');
-        $query->execute([
-            trim(htmlspecialchars($radioData[0], ENT_QUOTES)),
-            trim(htmlspecialchars($radioData[1], ENT_QUOTES)),
-            'ready',
-            getNow(),
-            NULL,
-        ]);
+        [$radioId, $name] = $radioData;
+        if (!empty($radioId) && !empty($name)) {
+            $query->execute([
+                trim(htmlspecialchars($radioId, ENT_QUOTES)),
+                trim(htmlspecialchars($name, ENT_QUOTES)),
+                'ready',
+                getNow(),
+                NULL,
+            ]);
+        }
         $this->logger->addInfo('Added radio from import with ID '.htmlspecialchars($importRadio['radioId'], ENT_QUOTES));
     }
 
