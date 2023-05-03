@@ -6,6 +6,7 @@ use \Psr\Http\Message\ResponseInterface as Response;
 require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/utils.php';
 
+
 // LOAD ENVS
 
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__.'/../');
@@ -42,13 +43,16 @@ $container['db'] = function ($c) {
 
 $container['view'] = new \Slim\Views\PhpRenderer('../templates/');
 
+
 // MIDDLEWARE
 // AUTH
+
 $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
     'users' => [
         $_ENV['AUTH_USER'] => $_ENV['AUTH_PASS'],
     ]
 ]));
+
 
 // ROUTES
 
@@ -56,9 +60,15 @@ $app->get('/phpinfo', function (Request $request, Response $response) {
 	return $response->getBody()->write(phpinfo());
 });
 
-$app->get('/new-radio', function (Request $request, Response $response) {
-	return $this->view->render($response, 'new-radio.phtml', ['router' => $this->router]);
-})->setName('new-radio');
+$app->get('/management-radio', function (Request $request, Response $response) {
+    $query = $this->db->query('SELECT `id`,`radioId`, `name` FROM `radios` ORDER BY `radioId` ASC, `name` ASC');
+    $radios = $query->fetchAll();
+
+	return $this->view->render($response, 'management-radio.phtml', [
+        'router' => $this->router,
+        'radios' => $radios,
+    ]);
+})->setName('management-radio');
 
 $app->post('/add-new-radio', function (Request $request, Response $response) {
 	$parsedBody = $request->getParsedBody();
@@ -100,6 +110,16 @@ $app->post('/import-radio', function (Request $request, Response $response) {
 
 	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('import-radio');
+
+$app->post('/delete-radio', function (Request $request, Response $response) {
+    $parsedBody = $request->getParsedBody();
+    $query = $this->db->prepare('DELETE FROM `radios` WHERE `id` = ?');
+    $query->execute([htmlspecialchars($parsedBody['id'], ENT_QUOTES)],
+    );
+    $this->logger->addInfo('Deleted radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
+
+    return $response->withHeader('Location', $this->router->pathFor('management-radio'));
+})->setName('delete-radio');
 
 $app->post('/update-channel', function (Request $request, Response $response) {
 	$parsedBody = $request->getParsedBody();
@@ -156,7 +176,7 @@ $app->get('/log', function (Request $request, Response $response) {
 
 $app->get('/', function (Request $request, Response $response) {
 	//get items from DB
-	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, `last-action-time`, `channel`, `last-borrower` FROM `radios` ORDER BY `status`="ready" DESC, status="charging" DESC, status="lent" DESC, `last-action-time` ASC');
+	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, `last-action-time`, `channel`, `last-borrower` FROM `radios` ORDER BY `last-action-time` DESC');
 	$radios = $query->fetchAll();
 	$formTemplatesDirectory = 'radio-list-form-templates/';
 	
@@ -205,6 +225,7 @@ $app->get('/', function (Request $request, Response $response) {
 
 
 // FIRE!
+
 try {
     $app->run();
 } catch (Throwable $e) {

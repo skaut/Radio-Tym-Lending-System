@@ -1,0 +1,51 @@
+<?php require 'prefix.phtml' ?>
+
+	<h2>RTLS - Správa radií</h2>
+
+<?php require 'main-menu.phtml' ?>
+
+	<article>
+		<h3>Přidat rádio: </h3>
+		<form method="POST" action="<?= $router->pathFor('add-new-radio'); ?>">
+			<input type="text" id="radioId" name="radioId" placeholder="ID rádia" required>
+			<input type="text" id="name" name="name" placeholder="Název" required>
+			<input type="submit" class="pure-button pure-button-primary" value="Přidat radio">
+			
+		</form>
+		<br/>
+		<h3>Hromadný import: </h3>
+		<form method="POST" action="<?= $router->pathFor('import-radio'); ?>">
+			<textarea name="importRadio" rows="5" cols="60">AA1;Baofeng
+AA2;Baofeng</textarea><br/>
+			<br/>
+			<input type="submit" value="Importovat" class="pure-button">
+		</form>
+		<br/>
+		<h3>Mazání rádií: </h3>
+		<table id="mainTable" class="table pure-table pure-table-striped">
+			<thead>
+			<tr>
+				<th>Radio ID</th>
+				<th>Název</th>
+				<th>Akce</th>
+			</tr>
+			</thead>
+
+			<tbody>
+			<?php foreach ($radios as $r): ?>
+				<tr>
+					<td><?= $r['radioId'] ?></td>
+					<td><?= $r['name'] ?></td>
+					<td>
+						<form method="POST" action="<?= $router->pathFor('delete-radio') ?>">
+							<input type="hidden" name="id" value="<?= $r['id'] ?>">
+							<input type="submit" class="pure-button" value="Smazat!">
+						</form>
+					</td>
+				</tr>
+			<?php endforeach ?>
+			</tbody>
+		</table>
+	</article>
+
+<?php require 'suffix.phtml' ?>
