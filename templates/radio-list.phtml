@@ -60,7 +60,9 @@
 							<input type="hidden" name="radioId" value="<?= $r['id'] ?>">
 						</form>
 					</td>
-					<td><?= $r['last-borrower'] ?><!-- <?= removeDiacritic($r['last-borrower']) ?> --></td>
+					<td class="<?php if ($r['status'] == 'lent') echo 'highlight'; else echo 'dimnish';?>">
+						<?= $r['last-borrower'] ?><!-- <?= removeDiacritic($r['last-borrower']) ?> -->
+					</td>
 					<td>
 						<?php require($r['formTemplateLink']); ?>
 					</td>

@@ -44,3 +44,11 @@ footer {
 .right {
 	float: right;
 }
+
+td.highlight {
+	font-weight: bold;
+}
+
+td.dimnish {
+	color: #666666;
+}
