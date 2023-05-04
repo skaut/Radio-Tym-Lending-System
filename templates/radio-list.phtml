@@ -25,7 +25,7 @@
 
 			<tbody>
 			<?php foreach ($radios as $r): ?>
-				<tr>
+				<tr class="<?php if ($r['status'] == 'lent') echo 'highlight'; else echo 'dimnish';?>">
 					<td><?= $r['radioId'] ?></td>
 					<td><?= $r['name'] ?></td>
 					<td>

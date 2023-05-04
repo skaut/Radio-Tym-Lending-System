@@ -45,10 +45,10 @@ footer {
 	float: right;
 }
 
-td.highlight {
+tr.highlight {
 	font-weight: bold;
 }
 
-td.dimnish {
-	color: #666666;
+tr.dimnish {
+	color: #333;
 }
