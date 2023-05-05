@@ -51,6 +51,7 @@
 					<td>
 						<form method="POST" action="<?= $router->pathFor('update-channel'); ?>">
 							<select name="channel" required="required" onchange="this.form.submit();">
+								<!-- c<?= $r['channel'] ?> ch<?= $r['channel'] ?> channel<?= $r['channel'] ?> c:<?= $r['channel'] ?> ch:<?= $r['channel'] ?> channel:<?= $r['channel'] ?>-->
 								<?php foreach($channels as $channel): ?>
 									<option value="<?= $channel ?>" <?php if ($r['channel'] === (string)$channel) echo 'selected="selected"'; ?>>
 										<?= $channel ?>
