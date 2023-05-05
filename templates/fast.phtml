@@ -1,0 +1,23 @@
+<?php require 'prefix.phtml' ?>
+
+	<h2>RTLS - fast swap</h2>
+
+<?php require 'main-menu.phtml' ?>
+
+	<article>
+		<h4><?= $r['radioId'] ?> - <?= $r['name'] ?> - <?= $r['last-borrower'] ?></h4>
+		<?php if ($r['status'] === 'lent'): ?>
+			<form method="POST" action="<?= $router->pathFor('fast-return'); ?>">
+				<input type="submit" value="Vrátit" class="pure-button">
+				<input type="hidden" name="radioId" value="<?= $r['radioId'] ?>">
+			</form>
+		<?php else: ?>
+			<form method="POST" action="<?= $router->pathFor('fast-lent'); ?>">
+				<input type="text" name="borrower" laceholder="třeba Šutr..." required="required">
+				<input type="submit" value="Vypůjčit" class="pure-button">
+				<input type="hidden" name="radioId" value="<?= $r['radioId'] ?>">
+			</form>
+		<?php endif ?>
+	</article>
+
+<?php require 'suffix.phtml' ?>

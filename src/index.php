@@ -174,6 +174,38 @@ $app->get('/log', function (Request $request, Response $response) {
 	return $this->view->render($response, 'log.phtml', ['router' => $this->router, 'log' => explode(PHP_EOL, $logData)]);
 })->setName('log');
 
+$app->get('/{radioId}', function (Request $request, Response $response, array $args) {
+    $radioId = $args['radioId'];
+    $query = $this->db->prepare('SELECT * FROM `radios` WHERE `radioId` = ?');
+    $query->execute([$radioId]);
+
+    return $this->view->render($response, 'fast.phtml', ['router' => $this->router, 'r' => $query->fetch()]);
+})->setName('fast');
+
+$app->post('/fast-return', function (Request $request, Response $response) {
+    $query = $this->db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `radioId` = ?');
+    $query->execute([$request->getParsedBody()['radioId']]);
+
+    return $response->withHeader('Location', $this->router->pathFor('radio-list'));
+})->setName('fast-return');
+
+$app->post('/fast-lent', function (Request $request, Response $response) {
+    $parsedBody = $request->getParsedBody();
+    $radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
+    $borrower = htmlspecialchars($parsedBody['borrower'], ENT_QUOTES);
+
+    $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ?, `last-borrower` = ? WHERE `radioId` = ?');
+    $query->execute([
+        'lent',
+        getNow(),
+        $borrower,
+        $radioId,
+    ]);
+    $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.');
+
+    return $response->withHeader('Location', $this->router->pathFor('radio-list'));
+})->setName('fast-lent');
+
 $app->get('/', function (Request $request, Response $response) {
 	//get items from DB
 	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, `last-action-time`, `channel`, `last-borrower` FROM `radios` ORDER BY `last-action-time` DESC');
