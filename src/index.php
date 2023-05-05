@@ -1,5 +1,6 @@
 <?php
 
+use chillerlan\QRCode\QROptions;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 
@@ -174,14 +175,6 @@ $app->get('/log', function (Request $request, Response $response) {
 	return $this->view->render($response, 'log.phtml', ['router' => $this->router, 'log' => explode(PHP_EOL, $logData)]);
 })->setName('log');
 
-$app->get('/{radioId}', function (Request $request, Response $response, array $args) {
-    $radioId = $args['radioId'];
-    $query = $this->db->prepare('SELECT * FROM `radios` WHERE `radioId` = ?');
-    $query->execute([$radioId]);
-
-    return $this->view->render($response, 'fast.phtml', ['router' => $this->router, 'r' => $query->fetch()]);
-})->setName('fast');
-
 $app->post('/fast-return', function (Request $request, Response $response) {
     $query = $this->db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `radioId` = ?');
     $query->execute([$request->getParsedBody()['radioId']]);
@@ -205,6 +198,30 @@ $app->post('/fast-lent', function (Request $request, Response $response) {
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('fast-lent');
+
+$app->get('/qr-generate', function (Request $request, Response $response) {
+    $query = $this->db->query('SELECT * FROM `radios`');
+    $radios = $query->fetchAll();
+    $body = $response->getBody();
+    $options = new QROptions([
+        'eccLevel' => 0,
+    ]);
+
+    return $this->view->render($response, 'qr.phtml', [
+        'router' => $this->router,
+        'base_uri' => $_ENV['BASE_URL'],
+        'radios' => $radios,
+        'qr_options' => $options,
+    ]);
+})->setName('qr-generate');
+
+$app->get('/{radioId}', function (Request $request, Response $response, array $args) {
+    $radioId = $args['radioId'];
+    $query = $this->db->prepare('SELECT * FROM `radios` WHERE `radioId` = ?');
+    $query->execute([$radioId]);
+
+    return $this->view->render($response, 'fast.phtml', ['router' => $this->router, 'r' => $query->fetch()]);
+})->setName('fast');
 
 $app->get('/', function (Request $request, Response $response) {
 	//get items from DB

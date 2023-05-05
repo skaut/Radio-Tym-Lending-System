@@ -52,3 +52,25 @@ tr.highlight {
 tr.dimnish {
 	color: #333;
 }
+
+.qr-article {
+	display: flex;
+	flex-wrap: wrap;
+}
+
+.qr-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	
+	width: 4em;
+	padding: 0.6em;
+	border: #999 1px solid;
+}
+
+.qr-image {
+}
+
+.qr-text {
+	font-weight: bold;
+}
