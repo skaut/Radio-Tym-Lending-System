@@ -176,8 +176,11 @@ $app->get('/log', function (Request $request, Response $response) {
 })->setName('log');
 
 $app->post('/fast-return', function (Request $request, Response $response) {
-    $query = $this->db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `radioId` = ?');
-    $query->execute([$request->getParsedBody()['radioId']]);
+    $query = $this->db->prepare('UPDATE `radios` SET `status` = "ready", `last-action-time` = ? WHERE `radioId` = ?');
+    $query->execute([
+        getNow(),
+        $request->getParsedBody()['radioId'],
+    ]);
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('fast-return');
