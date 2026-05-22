@@ -6,11 +6,20 @@
 
 `$ git clone https://github.com/skaut/Radio-Tym-Lending-System.git`
 
-`$ composer update`
+`$ composer install`
 
-navštívit URL `[server]/rtls/src`, popř. nasměrovat vrituál do této složky
+Požadavky:
+- PHP 8.4
+- Composer
+- PHP extensions `pdo_sqlite`, `mbstring` a `simplexml`
 
-Nastavit permissions `rtls.sqlite` writable pro nginx.
+Pro lokální běh na Debian stable:
+
+`$ sudo apt install php php-cli php-sqlite3 php-mbstring php-xml composer unzip`
+
+Pak navštívit URL `[server]/`, popř. nasměrovat virtuál do kořene projektu.
+
+Nastavit permissions `src/rtls.sqlite` a `logs/rtls.log` writable pro uživatele webserveru.
 
 ## Use
 
@@ -21,7 +30,7 @@ Online demo na webu výše
 
 **Databáze** - je pouitá SQlite, aby byla instalace co nejjednodušší. Při použití více různých sad rádíí stačí soubor s databází `src/rtls.sqlite` nahrazovat. Doporučuji mít základní stav rádií před akcí uložený a vždy před začátkem ho použít znovu. Je také možnost zálohováním tohoto souboru dělat zálohy jednotlivých akcí a potom je archivovat, takže bude možné dozadu dohledat, co se s jednotlivými rádii dělo.
 
-**Server** - jde použít Nginx nebo Apache2 (potom je dobré nastavit virtuální složku do projektové složky `src/`, aby přístup do aplikace měl hezkou URL.
+**Server** - jde použít Nginx nebo Apache2. Doporučené je nasměrovat virtuál do kořene projektu, aby byly dostupné i statické soubory z `public/`.
 
 Lze také použít vestavěný PHP server spuštěním příkazu `$ php -S localhost:8000` se žádaným portem, potom ale aplikace nebude přístupná online (vhodné pro řešení na jednom PC, protože se potom nemusí řešit online zabezpečení).
 

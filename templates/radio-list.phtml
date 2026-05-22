@@ -6,7 +6,7 @@
 
 	<article>
 		<br/>
-		<script type="text/javascript" src="../public/filter.js"></script>
+		<script type="text/javascript" src="/public/filter.js"></script>
 		Filtrování vysílaček: <input autofocus="autofocus" id="inputFilter" type="text" placeholder="zkus Šutr, M403..." onkeyup="filterInput()">
 		<span class="right">v terénu: <?= $radioCounts['lent'] ?> ks; k dispozici: <?= $radioCounts['notLent'] ?> ks</span><br/>
 		<br/>
@@ -39,7 +39,7 @@
 						</div>
 						<?php if ($r['status'] == 'charging') : ?>
 							<?php $showTime = max(0, strtotime($r['last-action-time'].'+ 2 hours') - strtotime(getNow())) ?>
-							<script type="text/javascript" src="../public/timer.js"></script>
+							<script type="text/javascript" src="/public/timer.js"></script>
 							<script>
 								var timerDisplay = document.querySelector('#timer_<?= $r['id'] ?>');
 								var statusDisplay = document.querySelector('#status_<?= $r['id'] ?>');

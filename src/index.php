@@ -1,11 +1,17 @@
 <?php
 
 use chillerlan\QRCode\QROptions;
+use chillerlan\QRCode\QRCode;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 
 require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/utils.php';
+
+$projectRoot = dirname(__DIR__);
+$databasePath = __DIR__.'/rtls.sqlite';
+$logPath = $projectRoot.'/logs/rtls.log';
+$templatesPath = $projectRoot.'/templates/';
 
 
 // LOAD ENVS
@@ -18,7 +24,8 @@ $dotenv->load();
 
 $config['displayErrorDetails'] = true;
 $config['addContentLengthHeader'] = false;
-$config['db']['sqliteDbName'] = 'rtls.sqlite';
+$config['db']['sqliteDbName'] = $databasePath;
+$config['logPath'] = $logPath;
 
 $app = new \Slim\App(['settings' => $config]);
 $container = $app->getContainer();
@@ -28,7 +35,7 @@ $container = $app->getContainer();
 
 $container['logger'] = function ($c) {
 	$logger = new \Monolog\Logger('fileLogger');
-	$file_handler = new \Monolog\Handler\StreamHandler('../logs/rtls.log');
+	$file_handler = new \Monolog\Handler\StreamHandler($c['settings']['logPath']);
 	$logger->pushHandler($file_handler);
 	return $logger;
 };
@@ -38,17 +45,25 @@ $container['db'] = function ($c) {
 	$pdo = new PDO('sqlite:'.$db['sqliteDbName']);
 	$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 	$pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+    $columns = $pdo->query('PRAGMA table_info(`radios`)')->fetchAll();
+    $columnNames = array_column($columns, 'name');
+
+    if (!in_array('channel', $columnNames, true)) {
+        $pdo->exec('ALTER TABLE `radios` ADD COLUMN `channel` TEXT');
+    }
 	
 	return $pdo;
 };
 
-$container['view'] = new \Slim\Views\PhpRenderer('../templates/');
+$container['view'] = new \Slim\Views\PhpRenderer($templatesPath);
 
 
 // MIDDLEWARE
 // AUTH
 
 $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
+    'secure' => false,
     'users' => [
         $_ENV['AUTH_USER'] => $_ENV['AUTH_PASS'],
     ]
@@ -170,7 +185,7 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
 })->setName('radio-action');
 
 $app->get('/log', function (Request $request, Response $response) {
-	$logData = file_get_contents('../logs/rtls.log');
+	$logData = file_get_contents($this->settings['logPath']);
 	
 	return $this->view->render($response, 'log.phtml', ['router' => $this->router, 'log' => explode(PHP_EOL, $logData)]);
 })->setName('log');
@@ -205,14 +220,16 @@ $app->post('/fast-lent', function (Request $request, Response $response) {
 $app->get('/qr-generate', function (Request $request, Response $response) {
     $query = $this->db->query('SELECT * FROM `radios`');
     $radios = $query->fetchAll();
-    $body = $response->getBody();
     $options = new QROptions([
         'eccLevel' => 0,
+        'outputType' => QRCode::OUTPUT_MARKUP_SVG,
+        'imageBase64' => true,
     ]);
+    $baseUrl = sprintf('%s://%s', $request->getUri()->getScheme(), $request->getUri()->getAuthority());
 
     return $this->view->render($response, 'qr.phtml', [
         'router' => $this->router,
-        'base_uri' => $_ENV['BASE_URL'],
+        'base_uri' => $baseUrl,
         'radios' => $radios,
         'qr_options' => $options,
     ]);
