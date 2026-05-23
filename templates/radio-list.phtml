@@ -1,22 +1,34 @@
 <?php require 'prefix.phtml' ?>
 
-	<h2>RTLS - Seznam rádií</h2>
+	<header class="page-header">
+		<h2>RTLS - Seznam rádií</h2>
+		<p class="page-subtitle">Přehled stavu rádií s rychlými akcemi pro výpůjčku, vrácení a změnu kanálu.</p>
+	</header>
 
 <?php require 'main-menu.phtml' ?>
 
-	<article>
-		<br/>
+	<article class="content-section">
 		<script type="text/javascript" src="/public/filter.js"></script>
-		Filtrování vysílaček: <input autofocus="autofocus" id="inputFilter" type="text" placeholder="zkus Šutr, M403..." onkeyup="filterInput()">
-		<span class="right">v terénu: <?= $radioCounts['lent'] ?> ks; k dispozici: <?= $radioCounts['notLent'] ?> ks</span><br/>
-		<br/>
-		<table id="mainTable" class="table pure-table pure-table-striped">
+		<script type="text/javascript" src="/public/async-actions.js"></script>
+		<div class="toolbar">
+			<label class="filter-field" for="inputFilter">
+				<span>Filtrování vysílaček</span>
+				<input autofocus="autofocus" id="inputFilter" type="text" placeholder="zkus Šutr, M403..." onkeyup="filterInput()">
+			</label>
+			<div class="stats-summary">
+				<span>V terénu: <strong id="count-lent"><?= $radioCounts['lent'] ?></strong> ks</span>
+				<span>K dispozici: <strong id="count-not-lent"><?= $radioCounts['notLent'] ?></strong> ks</span>
+			</div>
+		</div>
+		<div id="asyncNotice" class="async-notice" aria-live="polite"></div>
+		<div class="table-wrap">
+		<table id="mainTable" class="table pure-table pure-table-striped radios-table">
 			<thead>
 			<tr>
 				<th>Radio ID</th>
 				<th>Název</th>
 				<th>Stav</th>
-				<th>Čas poslední akce</th>
+				<th class="optional-mobile-column">Čas poslední akce</th>
 				<th>Kanál</th>
 				<th>Poslední vypůjčitel</th>
 				<th>Akce</th>
@@ -25,32 +37,18 @@
 
 			<tbody>
 			<?php foreach ($radios as $r): ?>
-				<tr class="<?php if ($r['status'] == 'lent') echo 'highlight'; else echo 'dimnish';?>">
-					<td><?= $r['radioId'] ?></td>
-					<td><?= $r['name'] ?></td>
-					<td>
+				<tr id="radio-row_<?= $r['id'] ?>" class="radio-row <?php if ($r['status'] == 'lent') echo 'highlight'; else echo 'dimnish';?>" data-radio-id="<?= $r['id'] ?>">
+					<td data-label="Radio ID"><?= $r['radioId'] ?></td>
+					<td data-label="Název"><?= $r['name'] ?></td>
+					<td data-label="Stav">
 						<div id="status_<?= $r['id'] ?>">
 							<?= $statusDictionary[$r['status']] ?>
 						</div>
-						<div id="timer_<?= $r['id'] ?>">
-							<?php if ($r['status'] == 'charging') : ?>
-								00:00:00
-							<?php endif ?>
-						</div>
-						<?php if ($r['status'] == 'charging') : ?>
-							<?php $showTime = max(0, strtotime($r['last-action-time'].'+ 2 hours') - strtotime(getNow())) ?>
-							<script type="text/javascript" src="/public/timer.js"></script>
-							<script>
-								var timerDisplay = document.querySelector('#timer_<?= $r['id'] ?>');
-								var statusDisplay = document.querySelector('#status_<?= $r['id'] ?>');
-								startTimer(<?= $showTime; ?>, timerDisplay, statusDisplay);
-							</script>
-						<?php endif ?>
 					</td>
-					<td><?= date_create($r['last-action-time'])->format('H:i:s d/m/y') ?></td>
-					<td>
-						<form method="POST" action="<?= $router->pathFor('update-channel'); ?>">
-							<select name="channel" required="required" onchange="this.form.submit();">
+					<td data-label="Čas poslední akce" class="optional-mobile-column cell-last-action"><?= date_create($r['last-action-time'])->format('H:i:s d/m/y') ?></td>
+					<td data-label="Kanál" class="cell-channel">
+						<form class="action-form action-form-channel" method="POST" action="<?= $router->pathFor('update-channel'); ?>">
+							<select name="channel" required="required">
 								<!-- c<?= $r['channel'] ?> ch<?= $r['channel'] ?> channel<?= $r['channel'] ?> c:<?= $r['channel'] ?> ch:<?= $r['channel'] ?> channel:<?= $r['channel'] ?>-->
 								<?php foreach($channels as $channel): ?>
 									<option value="<?= $channel ?>" <?php if ($r['channel'] === (string)$channel) echo 'selected="selected"'; ?>>
@@ -61,16 +59,17 @@
 							<input type="hidden" name="radioId" value="<?= $r['id'] ?>">
 						</form>
 					</td>
-					<td class="<?php if ($r['status'] == 'lent') echo 'highlight'; else echo 'dimnish';?>">
+					<td data-label="Poslední vypůjčitel" class="cell-borrower <?php if ($r['status'] == 'lent') echo 'highlight'; else echo 'dimnish';?>">
 						<?= $r['last-borrower'] ?><!-- <?= removeDiacritic($r['last-borrower']) ?> -->
 					</td>
-					<td>
+					<td data-label="Akce" class="actions-cell" id="actions_<?= $r['id'] ?>">
 						<?php require($r['formTemplateLink']); ?>
 					</td>
 				</tr>
 			<?php endforeach ?>
 			</tbody>
 		</table>
+		</div>
 	</article>
 
 <?php require 'suffix.phtml' ?>

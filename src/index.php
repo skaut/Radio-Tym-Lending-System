@@ -19,6 +19,105 @@ $templatesPath = $projectRoot.'/templates/';
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__.'/../');
 $dotenv->load();
 
+function isAsyncRequest(Request $request): bool
+{
+    $requestedWith = $request->getHeaderLine('X-Requested-With');
+    $accept = $request->getHeaderLine('Accept');
+
+    return strcasecmp($requestedWith, 'XMLHttpRequest') === 0 || stripos($accept, 'application/json') !== false;
+}
+
+function jsonResponse(Response $response, array $payload, int $status = 200): Response
+{
+    $response = $response->withHeader('Content-Type', 'application/json')->withStatus($status);
+    $response->getBody()->write(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+    return $response;
+}
+
+function getStatusDictionary(): array
+{
+    return [
+        'lent' => 'Vypůjčeno',
+        'charging' => 'Nabíjí se',
+        'ready' => 'Ready',
+    ];
+}
+
+function isChargingComplete(array $radio): bool
+{
+    if (($radio['status'] ?? '') !== 'charging' || empty($radio['last-action-time'])) {
+        return false;
+    }
+
+    return strtotime($radio['last-action-time'].' +2 hours') <= strtotime(getNow());
+}
+
+function normalizeRadioState(PDO $db, Monolog\Logger $logger, array $radio): array
+{
+    if (isChargingComplete($radio)) {
+        $query = $db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `id` = ?');
+        $query->execute([$radio['id']]);
+        $logger->addInfo('Radio with ID '.$radio['radioId'].' is set as charged and ready.');
+        $radio['status'] = 'ready';
+    }
+
+    return $radio;
+}
+
+function fetchRadioByColumn(PDO $db, Monolog\Logger $logger, string $column, $value): ?array
+{
+    $allowedColumns = ['id', 'radioId'];
+    if (!in_array($column, $allowedColumns, true)) {
+        throw new InvalidArgumentException('Unsupported lookup column.');
+    }
+
+    $query = $db->prepare(sprintf(
+        'SELECT `id`,`radioId`,`name`,`status`,`last-action-time`,`channel`,`last-borrower` FROM `radios` WHERE `%s` = ?',
+        $column
+    ));
+    $query->execute([$value]);
+    $radio = $query->fetch();
+
+    if (!$radio) {
+        return null;
+    }
+
+    return normalizeRadioState($db, $logger, $radio);
+}
+
+function getRadioCounts(PDO $db): array
+{
+    return [
+        'lent' => (int)$db->query('SELECT COUNT(`id`) as count FROM `radios` WHERE status = "lent"')->fetch()['count'],
+        'notLent' => (int)$db->query('SELECT COUNT(`id`) as count FROM `radios` WHERE status = "ready" OR status = "charging"')->fetch()['count'],
+    ];
+}
+
+function buildRadioPayload(array $radio): array
+{
+    $statusDictionary = getStatusDictionary();
+    $timerSeconds = null;
+
+    if ($radio['status'] === 'charging') {
+        $timerSeconds = max(0, strtotime($radio['last-action-time'].' +2 hours') - strtotime(getNow()));
+    }
+
+    return [
+        'id' => (int)$radio['id'],
+        'radioId' => $radio['radioId'],
+        'name' => $radio['name'],
+        'status' => $radio['status'],
+        'statusLabel' => $statusDictionary[$radio['status']] ?? $radio['status'],
+        'lastActionTime' => $radio['last-action-time'],
+        'lastActionTimeDisplay' => date_create($radio['last-action-time'])->format('H:i:s d/m/y'),
+        'channel' => (string)($radio['channel'] ?? ''),
+        'lastBorrower' => (string)($radio['last-borrower'] ?? ''),
+        'timerSeconds' => $timerSeconds,
+        'nextAction' => $radio['status'] === 'lent' ? 'return' : 'lend',
+    ];
+}
+
 
 // CONFIGURATION
 
@@ -147,6 +246,17 @@ $app->post('/update-channel', function (Request $request, Response $response) {
 	);
 	$this->logger->addInfo('Changed channel for radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
 
+    if (isAsyncRequest($request)) {
+        $radio = fetchRadioByColumn($this->db, $this->logger, 'id', htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
+
+        return jsonResponse($response, [
+            'success' => true,
+            'message' => 'Kanál uložen.',
+            'radio' => buildRadioPayload($radio),
+            'counts' => getRadioCounts($this->db),
+        ]);
+    }
+
 	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('update-channel');
 
@@ -180,6 +290,23 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
 		default:
 			throw new Exception('Unknown radio-action argument');
 	}
+
+    if (isAsyncRequest($request)) {
+        $radio = fetchRadioByColumn($this->db, $this->logger, 'id', $id);
+        $message = match ($argumentAction) {
+            'lend' => 'Vypůjčení uloženo.',
+            'return' => 'Vrácení uloženo.',
+            'charged' => 'Rádio označeno jako ready.',
+            default => 'Změna uložena.',
+        };
+
+        return jsonResponse($response, [
+            'success' => true,
+            'message' => $message,
+            'radio' => buildRadioPayload($radio),
+            'counts' => getRadioCounts($this->db),
+        ]);
+    }
 	
 	return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('radio-action');
@@ -251,44 +378,27 @@ $app->get('/', function (Request $request, Response $response) {
 	
 	//get right link based by status
 	foreach ($radios as &$r) {
+        $r = normalizeRadioState($this->db, $this->logger, $r);
 		switch ($r['status']) {
 			case 'ready':
-				//lend available
-				$r['formTemplateLink'] = $formTemplatesDirectory.'lend.phtml';
+			case 'charging':
+                $r['formTemplateLink'] = $formTemplatesDirectory.'lend.phtml';
 				break;
 			case 'lent':
-				//return available
 				$r['formTemplateLink'] = $formTemplatesDirectory.'return.phtml';
-				break;
-			case 'charging':
-				//lend available (but with alert) - or change status to ready
-                $query = $this->db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `id` = ?');
-                $query->execute([$r['id']]);
-                $this->logger->addInfo('Radio with ID '.$r['radioId'].' is set as charged and ready.');
-                
-                $r['formTemplateLink'] = $formTemplatesDirectory.'lend.phtml';
 				break;
 		}
 	}
     unset($r);
 
     $channels = range(1, 16);
-	
-	$statusDictionary = [
-		'lent' => 'Vypůjčeno',
-		'charging' => 'Nabíjí se',
-		'ready' => 'Ready',
-	];
 
     return $this->view->render($response, 'radio-list.phtml', [
         'router' => $this->router,
         'radios' => $radios,
         'channels' => $channels,
-        'radioCounts' => [
-            'lent' => $this->db->query('SELECT COUNT(`id`) as count FROM `radios` WHERE status = "lent"')->fetch()['count'],
-            'notLent' => $this->db->query('SELECT COUNT(`id`) as count  FROM `radios` WHERE status = "ready" OR status = "charging"')->fetch()['count'],
-        ],
-        'statusDictionary' => $statusDictionary,
+        'radioCounts' => getRadioCounts($this->db),
+        'statusDictionary' => getStatusDictionary(),
     ]);
 })->setName('radio-list');
 

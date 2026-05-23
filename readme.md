@@ -26,6 +26,8 @@ Nastavit permissions `src/rtls.sqlite` a `logs/rtls.log` writable pro uživatele
 Menu nahoře nabízí přehled všech vypůjčených rádií, přidání nového stroje a pohled do celkového logu.
 Online demo na webu výše
 
+`/dbadmin` zpřístupňuje jednoduchý databázový admin nad SQLite přes Adminer. Je chráněný stejným Basic Auth jako zbytek aplikace.
+
 ## Techs
 
 **Databáze** - je pouitá SQlite, aby byla instalace co nejjednodušší. Při použití více různých sad rádíí stačí soubor s databází `src/rtls.sqlite` nahrazovat. Doporučuji mít základní stav rádií před akcí uložený a vždy před začátkem ho použít znovu. Je také možnost zálohováním tohoto souboru dělat zálohy jednotlivých akcí a potom je archivovat, takže bude možné dozadu dohledat, co se s jednotlivými rádii dělo.

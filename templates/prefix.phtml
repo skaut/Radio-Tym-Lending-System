@@ -2,7 +2,9 @@
 <html>
 <head>
 	<link rel="stylesheet" href="/public/pure-min.css">
-	<link rel="stylesheet" href="/public/style.css">
+	<link rel="stylesheet" href="/public/style.css?v=<?= urlencode((string)filemtime(__DIR__.'/../public/style.css')) ?>">
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta charset="utf-8" />
 </head>
 	<body>
+		<div class="page-shell">
