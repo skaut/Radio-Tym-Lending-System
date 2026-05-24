@@ -8,12 +8,12 @@
 <?php require 'main-menu.phtml' ?>
 
 	<article class="content-section">
-		<script type="text/javascript" src="/public/filter.js"></script>
-		<script type="text/javascript" src="/public/async-actions.js"></script>
+		<script type="text/javascript" src="/public/filter.js?v=<?= filemtime(__DIR__.'/../public/filter.js') ?>"></script>
+		<script type="text/javascript" src="/public/async-actions.js?v=<?= filemtime(__DIR__.'/../public/async-actions.js') ?>"></script>
 		<div class="toolbar">
 			<label class="filter-field" for="inputFilter">
 				<span>Filtrování vysílaček</span>
-				<input autofocus="autofocus" id="inputFilter" type="text" placeholder="zkus Šutr, M403..." onkeyup="filterInput()">
+				<input autofocus="autofocus" id="inputFilter" type="text" placeholder="zkus Šutr, M403..." value="<?= htmlspecialchars($initialFilter ?? '', ENT_QUOTES) ?>" onkeyup="filterInput()" autocomplete="off" autocapitalize="off" spellcheck="false">
 			</label>
 			<div class="stats-summary">
 				<span>V terénu: <strong id="count-lent"><?= $radioCounts['lent'] ?></strong> ks</span>
@@ -37,9 +37,9 @@
 
 			<tbody>
 			<?php foreach ($radios as $r): ?>
-				<tr id="radio-row_<?= $r['id'] ?>" class="radio-row <?php if ($r['status'] == 'lent') echo 'highlight'; else echo 'dimnish';?>" data-radio-id="<?= $r['id'] ?>">
-					<td data-label="Radio ID"><?= $r['radioId'] ?></td>
-					<td data-label="Název"><?= $r['name'] ?></td>
+				<tr id="radio-row_<?= $r['id'] ?>" class="radio-row <?php if ($r['status'] == 'lent') echo 'highlight'; else echo 'dimnish';?>" data-radio-id="<?= $r['id'] ?>" data-radio-code="<?= htmlspecialchars($r['radioId'], ENT_QUOTES) ?>">
+					<td data-label="Radio ID" class="cell-radio-id"><?= $r['radioId'] ?></td>
+					<td data-label="Název" class="cell-name"><?= $r['name'] ?></td>
 					<td data-label="Stav">
 						<div id="status_<?= $r['id'] ?>">
 							<?= $statusDictionary[$r['status']] ?>
@@ -71,5 +71,11 @@
 		</table>
 		</div>
 	</article>
+
+	<?php if (!empty($initialFilter)): ?>
+		<script type="text/javascript">
+			filterInput();
+		</script>
+	<?php endif; ?>
 
 <?php require 'suffix.phtml' ?>
