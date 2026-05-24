@@ -1,0 +1,19 @@
+<?php require 'prefix.phtml' ?>
+
+	<header class="page-header">
+		<h2>RTLS - Informace o vysílačce</h2>
+		<p class="page-subtitle">Veřejný přehled základních informací o konkrétní vysílačce.</p>
+	</header>
+
+	<article class="content-section">
+		<section class="panel">
+			<h3><?= htmlspecialchars($radio['radioId']) ?> - <?= htmlspecialchars($radio['name']) ?></h3>
+			<p><strong>Stav:</strong> <?= htmlspecialchars($statusDictionary[$radio['status']] ?? $radio['status']) ?></p>
+			<p><strong>Poslední vypůjčitel:</strong> <?= htmlspecialchars((string)($radio['last-borrower'] ?: 'neuveden')) ?></p>
+			<p><strong>Kanál:</strong> <?= htmlspecialchars((string)($radio['channel'] ?: 'nenastaven')) ?></p>
+			<p><strong>Poslední změna:</strong> <?= date_create($radio['last-action-time'])->format('H:i:s d/m/y') ?></p>
+			<p>Tento veřejný detail lze později nahradit připravenou finální stránkou bez změny QR odkazu.</p>
+		</section>
+	</article>
+
+<?php require 'suffix.phtml' ?>

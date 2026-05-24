@@ -19,6 +19,18 @@ $templatesPath = $projectRoot.'/templates/';
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__.'/../');
 $dotenv->load();
 
+function hasValidBasicAuthCredentials(): bool
+{
+    $expectedUser = $_ENV['AUTH_USER'] ?? '';
+    $expectedPass = $_ENV['AUTH_PASS'] ?? '';
+    $providedUser = $_SERVER['PHP_AUTH_USER'] ?? null;
+    $providedPass = $_SERVER['PHP_AUTH_PW'] ?? null;
+
+    return $expectedUser !== ''
+        && $providedUser === $expectedUser
+        && $providedPass === $expectedPass;
+}
+
 function isAsyncRequest(Request $request): bool
 {
     $requestedWith = $request->getHeaderLine('X-Requested-With');
@@ -163,6 +175,10 @@ $container['view'] = new \Slim\Views\PhpRenderer($templatesPath);
 
 $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
     'secure' => false,
+    'ignore' => [
+        '/src',
+        '/public',
+    ],
     'users' => [
         $_ENV['AUTH_USER'] => $_ENV['AUTH_PASS'],
     ]
@@ -352,7 +368,15 @@ $app->get('/qr-generate', function (Request $request, Response $response) {
         'outputType' => QRCode::OUTPUT_MARKUP_SVG,
         'imageBase64' => true,
     ]);
-    $baseUrl = sprintf('%s://%s', $request->getUri()->getScheme(), $request->getUri()->getAuthority());
+    $uri = $request->getUri();
+    $host = $uri->getHost();
+    $port = $uri->getPort();
+    $baseUrl = sprintf(
+        '%s://%s%s',
+        $uri->getScheme(),
+        $host,
+        $port !== null ? ':'.$port : ''
+    );
 
     return $this->view->render($response, 'qr.phtml', [
         'router' => $this->router,
@@ -361,6 +385,35 @@ $app->get('/qr-generate', function (Request $request, Response $response) {
         'qr_options' => $options,
     ]);
 })->setName('qr-generate');
+
+$app->get('/src/{radioId}', function (Request $request, Response $response, array $args) {
+    $radioId = trim((string)$args['radioId']);
+    $radio = fetchRadioByColumn($this->db, $this->logger, 'radioId', $radioId);
+
+    if (!$radio) {
+        return $response->withStatus(404)->write('Radio not found.');
+    }
+
+    if (hasValidBasicAuthCredentials()) {
+        return $response->withHeader('Location', $this->router->pathFor('radio-list').'?filter='.rawurlencode($radioId));
+    }
+
+    return $response->withHeader('Location', $this->router->pathFor('public-radio-info', ['radioId' => $radioId]));
+})->setName('radio-scan-entry');
+
+$app->get('/public/{radioId}', function (Request $request, Response $response, array $args) {
+    $radioId = trim((string)$args['radioId']);
+    $radio = fetchRadioByColumn($this->db, $this->logger, 'radioId', $radioId);
+
+    if (!$radio) {
+        return $response->withStatus(404)->write('Radio not found.');
+    }
+
+    return $this->view->render($response, 'public-radio-info.phtml', [
+        'radio' => $radio,
+        'statusDictionary' => getStatusDictionary(),
+    ]);
+})->setName('public-radio-info');
 
 $app->get('/{radioId}', function (Request $request, Response $response, array $args) {
     $radioId = $args['radioId'];
@@ -375,6 +428,7 @@ $app->get('/', function (Request $request, Response $response) {
 	$query = $this->db->query('SELECT `id`,`radioId`, `name`, `status`, `last-action-time`, `channel`, `last-borrower` FROM `radios` ORDER BY `last-action-time` DESC');
 	$radios = $query->fetchAll();
 	$formTemplatesDirectory = 'radio-list-form-templates/';
+    $initialFilter = trim((string)($request->getQueryParams()['filter'] ?? ''));
 	
 	//get right link based by status
 	foreach ($radios as &$r) {
@@ -397,6 +451,7 @@ $app->get('/', function (Request $request, Response $response) {
         'router' => $this->router,
         'radios' => $radios,
         'channels' => $channels,
+        'initialFilter' => $initialFilter,
         'radioCounts' => getRadioCounts($this->db),
         'statusDictionary' => getStatusDictionary(),
     ]);

@@ -1,4 +1,12 @@
 (function () {
+    function focusFilterInput() {
+        const filterInput = document.getElementById('inputFilter');
+        if (filterInput instanceof HTMLInputElement) {
+            filterInput.focus();
+            filterInput.select();
+        }
+    }
+
     async function submitAsyncForm(form) {
         if (!(form instanceof HTMLFormElement)) {
             return false;
@@ -85,6 +93,7 @@
                 return;
             }
 
+            row.dataset.radioCode = radio.radioId;
             row.classList.toggle('highlight', radio.status === 'lent');
             row.classList.toggle('dimnish', radio.status !== 'lent');
 
@@ -148,10 +157,15 @@
             applyRadioUpdate(payload.radio);
             updateCounts(payload.counts);
             showNotice(payload.message || 'Uloženo.', false);
+
+            if (typeof window.rtlsAfterAsyncRadioUpdate === 'function') {
+                window.rtlsAfterAsyncRadioUpdate(payload.radio, form);
+            }
         } catch (error) {
             showNotice('Změnu se nepodařilo uložit. Zkus to znovu.', true);
         } finally {
             setBusy(false);
+            focusFilterInput();
         }
 
         return false;
@@ -161,6 +175,7 @@
         void submitAsyncForm(form);
         return false;
     };
+    window.rtlsFocusFilterInput = focusFilterInput;
 
     document.addEventListener('change', function (event) {
         const target = event.target;

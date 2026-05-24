@@ -21,3 +21,7 @@
 [2017-09-12 18:20:51] fileLogger.INFO: Radio with ID A7 is returned. [] []
 [2017-09-12 18:20:52] fileLogger.INFO: Radio with ID A4 is returned. [] []
 [2017-09-12 18:20:54] fileLogger.INFO: Radio with ID C8 is returned. [] []
+[2026-05-22 20:00:20] fileLogger.INFO: Radio with ID C8 is set as charged and ready. [] []
+[2026-05-22 20:00:20] fileLogger.INFO: Radio with ID A4 is set as charged and ready. [] []
+[2026-05-22 20:00:20] fileLogger.INFO: Radio with ID A7 is set as charged and ready. [] []
+[2026-05-22 20:00:32] fileLogger.INFO: Changed channel for radio with ID 1 [] []
