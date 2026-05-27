@@ -1,28 +1,34 @@
 <?php require 'prefix.phtml' ?>
 
-	<h2>RTLS - Správa radií</h2>
+	<header class="page-header">
+		<h2>RTLS - Správa radií</h2>
+		<p class="page-subtitle">Přidání, import a mazání rádií v rozložení použitelné pro mobil i desktop.</p>
+	</header>
 
 <?php require 'main-menu.phtml' ?>
 
-	<article>
-		<h3>Přidat rádio: </h3>
-		<form method="POST" action="<?= $router->pathFor('add-new-radio'); ?>">
+	<article class="content-section">
+		<section class="panel">
+		<h3>Přidat rádio</h3>
+		<form class="stacked-form" method="POST" action="<?= $router->pathFor('add-new-radio'); ?>">
 			<input type="text" id="radioId" name="radioId" placeholder="ID rádia" required>
 			<input type="text" id="name" name="name" placeholder="Název" required>
 			<input type="submit" class="pure-button pure-button-primary" value="Přidat radio">
 			
 		</form>
-		<br/>
-		<h3>Hromadný import: </h3>
-		<form method="POST" action="<?= $router->pathFor('import-radio'); ?>">
+		</section>
+		<section class="panel">
+		<h3>Hromadný import</h3>
+		<form class="stacked-form" method="POST" action="<?= $router->pathFor('import-radio'); ?>">
 			<textarea name="importRadio" rows="5" cols="60">AA1;Baofeng
 AA2;Baofeng</textarea><br/>
-			<br/>
 			<input type="submit" value="Importovat" class="pure-button">
 		</form>
-		<br/>
-		<h3>Mazání rádií: </h3>
-		<table id="mainTable" class="table pure-table pure-table-striped">
+		</section>
+		<section class="panel">
+		<h3>Mazání rádií</h3>
+		<div class="table-wrap">
+		<table id="mainTable" class="table pure-table pure-table-striped radios-table">
 			<thead>
 			<tr>
 				<th>Radio ID</th>
@@ -33,10 +39,10 @@ AA2;Baofeng</textarea><br/>
 
 			<tbody>
 			<?php foreach ($radios as $r): ?>
-				<tr>
-					<td><?= $r['radioId'] ?></td>
-					<td><?= $r['name'] ?></td>
-					<td>
+				<tr class="radio-row">
+					<td data-label="Radio ID"><?= $r['radioId'] ?></td>
+					<td data-label="Název"><?= $r['name'] ?></td>
+					<td data-label="Akce" class="actions-cell">
 						<form method="POST" action="<?= $router->pathFor('delete-radio') ?>">
 							<input type="hidden" name="id" value="<?= $r['id'] ?>">
 							<input type="submit" class="pure-button" value="Smazat!">
@@ -46,6 +52,8 @@ AA2;Baofeng</textarea><br/>
 			<?php endforeach ?>
 			</tbody>
 		</table>
+		</div>
+		</section>
 	</article>
 
 <?php require 'suffix.phtml' ?>
