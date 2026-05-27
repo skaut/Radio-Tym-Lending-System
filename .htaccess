@@ -1,4 +1,6 @@
 RewriteEngine On
+RewriteRule ^dbadmin/?$ dbadmin/index.php [QSA,L]
+RewriteRule ^$ src/index.php [QSA,L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 
