@@ -3,8 +3,11 @@
   "description": "Radio Team Lending System for lending radios",
   "license": "MIT",
   "require": {
-    "php": "^7.4",
+    "php": "^8.4",
     "ext-pdo": "*",
+    "ext-pdo_sqlite": "*",
+    "ext-mbstring": "*",
+    "ext-simplexml": "*",
     "slim/slim": "^3.0",
     "monolog/monolog": "^1.23",
     "slim/php-view": "^2.2",

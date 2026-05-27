@@ -1,4 +1,2 @@
 <?php
-header("HTTP/1.1 301 Moved Permanently");
-header("Location: /src");
-header("Connection: close");
+require __DIR__ . '/src/index.php';

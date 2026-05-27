@@ -1,4 +1,4 @@
-FROM php:7.4-apache
+FROM php:8.4-apache
 
 # Preparation for apt
 RUN set -ex
@@ -8,19 +8,11 @@ RUN apt-get update \
 	curl \
 	nano \
 	git \
-	zip \
-    libpq-dev \
-    zlib1g-dev \
-    libfreetype6-dev \
-    libjpeg62-turbo-dev \
-    libpng-dev
+	unzip
 
 RUN docker-php-ext-install \
-  gd \
-  pcntl \
   pdo \
-  pdo_pgsql \
-  pgsql
+  pdo_sqlite
 
 # Refresh apache2
 RUN a2enmod rewrite

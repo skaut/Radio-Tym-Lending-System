@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nalezena vysílačka</title>
+    <style>
+        /* Základní reset a nastavení boxů */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Globální zajištění, aby mobilní prohlížeče nescrollovaly do stran */
+        html, body {
+            overflow-x: hidden;
+            width: 100%;
+        }
+
+        /* Tmavé pozadí s jemnou technickou mřížkou */
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #0f1115;
+            background-image: 
+                linear-gradient(#1a1d24 1px, transparent 1px),
+                linear-gradient(90deg, #1a1d24 1px, transparent 1px);
+            background-size: 20px 20px;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        /* Hlavní kontejner - "karta" */
+        .container {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            max-width: 450px;
+            width: 100%;
+            padding: 30px 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        /* Hlavička a identifikace */
+        .status-badge {
+            display: inline-block;
+            background-color: #ff9800;
+            color: #000;
+            font-family: monospace;
+            font-weight: bold;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            margin-bottom: 10px;
+            color: #ffffff;
+        }
+
+        .tech-id {
+            font-family: monospace;
+            color: #8b949e;
+            font-size: 0.95rem;
+            background: #0d1117;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px dashed #30363d;
+            margin-bottom: 25px;
+            word-break: break-all;
+        }
+
+        /* Instrukční blok pro nálezce */
+        .instruction-box {
+            background-color: #1f242c;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin-bottom: 25px;
+            text-align: left;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .instruction-box strong {
+            color: #ffffff;
+            display: block;
+            margin-bottom: 5px;
+            font-size: 1.05rem;
+        }
+
+        .instruction-box span {
+            color: #8b949e;
+            font-size: 0.95rem;
+        }
+
+        /* Oddělovač */
+        hr {
+            border: 0;
+            border-top: 1px solid #30363d;
+            margin: 25px 0;
+        }
+
+        /* Sekce O nás */
+        h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #ff9800;
+        }
+
+        p {
+            font-size: 0.95rem;
+            color: #8b949e;
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        /* Zvýraznění textu */
+        .highlight {
+            color: #e2e8f0;
+            font-weight: 500;
+        }
+
+        /* Tlačítka */
+        .btn {
+            display: inline-block;
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1rem;
+            text-align: center;
+            transition: all 0.2s ease;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        .btn-login {
+            background-color: transparent;
+            color: #8b949e;
+            border: 1px solid #30363d;
+        }
+
+        .btn-login:hover, .btn-login:active {
+            background-color: #1f242c;
+            color: #e2e8f0;
+            border-color: #8b949e;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="status-badge">Nález potvrzen</div>
+        
+        <h1>Našli jste naši vysílačku</h1>
+        <p style="text-align: center;">Moc děkujeme! Toto zařízení je důležitou součástí naší komunikační sítě.</p>
+        
+        <div class="tech-id">
+            ID_ZARIZENI: #<?= htmlspecialchars($radio['radioId']) ?>
+            <?php if (!empty($radio['name'])): ?>
+                (<?= htmlspecialchars($radio['name']) ?>)
+            <?php endif; ?>
+        </div>
+
+        <div class="instruction-box">
+            <strong>Jak nám dát vědět?</strong>
+            <span>Stiskněte velké tlačítko na boku vysílačky (PTT), a řekněte, že jste ji našli a kde se nacházíte. Někdo z našeho týmu se vám obratem ozve zpět.</span>
+        </div>
+
+        <hr>
+
+        <h2>Kdo jsme?</h2>
+        
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam in dui mauris. Vivamus hendrerit arcu sed erat molestie vehicula. Sed auctor neque eu tellus rhoncus ut eleifend nibh porttitor. Ut in nulla enim. Phasellus molestie magna non est bibendum non venenatis nisl tempor. Suspendisse dictum feugiat nisl ut dapibus.</p>
+        
+        <p>Mauris iaculis porttitor posuere. Praesent id metus massa, ut blandit odio. Proin quis tortor orci. Etiam at risus et justo dignissim congue. Donec congue lacinia dui, a porttitor lectus condimentum laoreet. Nunc eu ullamcorper orci. Quisque eget odio ac lectus vestibulum faucibus eget in metus. In pellentesque faucibus vestibulum.</p>
+
+        <a href="/?filter=<?= htmlspecialchars($radio['radioId'], ENT_QUOTES) ?>" class="btn btn-login">Login</a>
+
+    </div>
+
+</body>
+</html>

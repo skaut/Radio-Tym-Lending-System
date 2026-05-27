@@ -7,7 +7,7 @@
 	<article class="qr-article">
 		<?php foreach ($radios as $r) : ?>
 			<div class="qr-container">
-				<img class="qr-image" style="width:4em" src="<?= (new chillerlan\QRCode\QRCode($options))->render($base_uri.'/src/'.$r['radioId']) ?>" alt="QR Code" />
+				<img class="qr-image" style="width:4em" src="<?= (new chillerlan\QRCode\QRCode($qr_options))->render($base_uri.'/src/'.$r['radioId']) ?>" alt="QR Code" />
 				<span class="qr-text"><?= $r['radioId'] ?></span>
 			</div>
 		<?php endforeach; ?>
