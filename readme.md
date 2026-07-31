@@ -21,6 +21,28 @@ Pak navštívit URL `[server]/`, popř. nasměrovat virtuál do kořene projektu
 
 Nastavit permissions `src/rtls.sqlite` a `logs/rtls.log` writable pro uživatele webserveru.
 
+Zkopírovat `.env.example` na `.env` a vyplnit `AUTH_USER` / `AUTH_PASS`. Bez `.env` se aplikace
+nespustí a vypíše, co chybí.
+
+## Nasazení na sdílený hosting přes FTP
+
+Hosting nemá Composer, takže se nahrává i složka `vendor/`. Postup:
+
+1. Lokálně `$ composer install --no-dev --optimize-autoloader`
+2. Nahrát přes FTP do kořene webu (na Lebeda hostingu složka `/www`):
+   `index.php`, `.htaccess`, `src/`, `templates/`, `public/`, `dbadmin/`, `vendor/`, `logs/`, `.env.example`
+3. Na serveru zkopírovat `.env.example` na `.env` a vyplnit `AUTH_USER`, `AUTH_PASS` a případně `API_TOKEN`.
+4. Nastavit práva: `775` pro složky `src/` a `logs/`, `664` pro `src/rtls.sqlite` a `logs/rtls.log`.
+   Zapisovatelná musí být i složka `src/`, protože si SQLite vedle databáze zakládá dočasné soubory.
+5. Otevřít `/` - přihlášení je Basic Auth podle `.env`. Rádia se naplní v `/management-radio`
+   (jednotlivě nebo hromadným importem ve formátu `ID;Název` po řádcích).
+
+Nenahrávat `deploy/`, `Dockerfile`, `docker-compose.yml`, `.git/` ani `.idea/` - na hostingu nejsou k ničemu.
+
+`.htaccess` blokuje přímé stažení `.env`, databáze (včetně SQLite souborů `-journal`/`-wal`/`-shm`),
+logů a souborů Composeru. Kdyby hosting `.htaccess` ignoroval, byly by tyhle soubory veřejně čitelné -
+což znamená vyzrazené heslo do administrace.
+
 ## Use
 
 Menu nahoře nabízí přehled všech vypůjčených rádií, přidání nového stroje a pohled do celkového logu.

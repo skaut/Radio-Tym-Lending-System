@@ -1,4 +1,16 @@
 <?php
+// Slim 3 and Monolog 1 emit a lot of deprecation notices on PHP 8.4. If those reach
+// the output, PHP can no longer send HTTP headers - which silently breaks every
+// redirect (lend, return, QR scan) and the Basic Auth challenge. So we keep them out
+// of the output and only write them to a log.
+error_reporting(E_ALL & ~E_DEPRECATED);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ini_set('error_log', __DIR__.'/../logs/php-error.log');
+// Safety net in case the hosting turns display_errors back on: while an output
+// buffer is open, headers can still be sent.
+ob_start();
+
 // FIX PRO LEBEDAHOSTING: Zabrání Slim frameworku, aby svévolně odřezával složku /src z URL adres
 $_SERVER['SCRIPT_NAME'] = '/index.php';
 
@@ -16,9 +28,46 @@ $logPath = $projectRoot.'/logs/rtls.log';
 $templatesPath = $projectRoot.'/templates/';
 
 
+// INSTALLATION CHECKS
+// Without these, both cases below end as a blank 500 with no explanation - and they
+// are by far the two most common mistakes after an FTP upload. Say what to fix instead.
+
+function installationError(string $title, string $detail): never
+{
+    http_response_code(500);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<h1>RTLS - instalace není dokončená</h1>';
+    echo '<h2>'.htmlspecialchars($title, ENT_QUOTES).'</h2>';
+    echo '<p>'.$detail.'</p>';
+    exit;
+}
+
+if (!is_readable($projectRoot.'/.env')) {
+    installationError(
+        'Chybí soubor .env',
+        'Zkopíruj na serveru <code>.env.example</code> na <code>.env</code> (do stejné složky jako <code>index.php</code>) a vyplň <code>AUTH_USER</code> a <code>AUTH_PASS</code>.'
+    );
+}
+
+if (!is_writable($databasePath) || !is_writable(dirname($databasePath))) {
+    installationError(
+        'Databáze není zapisovatelná',
+        'Nastav přes FTP práva <code>664</code> souboru <code>src/rtls.sqlite</code> a práva <code>775</code> složce <code>src/</code>. '
+        .'Zapisovatelná musí být i složka, protože SQLite si vedle databáze vytváří dočasné soubory.'
+    );
+}
+
+if (!is_writable($logPath) || !is_writable(dirname($logPath))) {
+    installationError(
+        'Složka logs/ není zapisovatelná',
+        'Nastav přes FTP práva <code>664</code> souboru <code>logs/rtls.log</code> a práva <code>775</code> složce <code>logs/</code>.'
+    );
+}
+
+
 // LOAD ENVS
 
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__.'/../');
+$dotenv = Dotenv\Dotenv::createImmutable($projectRoot);
 $dotenv->load();
 
 function hasValidBasicAuthCredentials(): bool
@@ -147,7 +196,9 @@ function buildRadioPayload(array $radio): array
 
 // CONFIGURATION
 
-$config['displayErrorDetails'] = true;
+// Show error details (including stack traces) only when DEBUG=true in .env - otherwise
+// anonymous visitors of the public /public/{radioId} page would see them too.
+$config['displayErrorDetails'] = filter_var($_ENV['DEBUG'] ?? 'false', FILTER_VALIDATE_BOOL);
 $config['addContentLengthHeader'] = false;
 $config['db']['sqliteDbName'] = $databasePath;
 $config['logPath'] = $logPath;
@@ -260,24 +311,31 @@ $app->post('/add-new-radio', function (Request $request, Response $response) {
 })->setName('add-new-radio');
 
 $app->post('/import-radio', function (Request $request, Response $response) {
-    $importRadio = $request->getParsedBody()['importRadio'];
-    $explodedImportRadio = explode(PHP_EOL, $importRadio);
+    $importRadio = (string)($request->getParsedBody()['importRadio'] ?? '');
+    // The textarea submits \r\n line endings, but PHP_EOL is just \n on Linux,
+    // so split on any kind of line break.
+    $explodedImportRadio = preg_split('/\R/', $importRadio);
+
+    $query = $this->db->prepare('INSERT INTO `radios` (`radioId`, `name`, `status`, `last-action-time`, `last-borrower`) VALUES (?, ?, ?, ?, ?)');
 
     foreach ($explodedImportRadio as $singleRadio) {
         $radioData = explode(';', $singleRadio);
-        
-        $query = $this->db->prepare('INSERT INTO `radios` (`radioId`, `name`, `status`, `last-action-time`, `last-borrower`) VALUES (?, ?, ?, ?, ?)');
-        [$radioId, $name] = $radioData;
-        if (!empty($radioId) && !empty($name)) {
-            $query->execute([
-                trim(htmlspecialchars($radioId, ENT_QUOTES)),
-                trim(htmlspecialchars($name, ENT_QUOTES)),
-                'ready',
-                getNow(),
-                NULL,
-            ]);
+        // A line may not have both parts (blank line, missing semicolon) - skip those.
+        $radioId = trim(htmlspecialchars($radioData[0] ?? '', ENT_QUOTES));
+        $name = trim(htmlspecialchars($radioData[1] ?? '', ENT_QUOTES));
+
+        if ($radioId === '' || $name === '') {
+            continue;
         }
-        $this->logger->addInfo('Added radio from import with ID '.htmlspecialchars($importRadio['radioId'], ENT_QUOTES));
+
+        $query->execute([
+            $radioId,
+            $name,
+            'ready',
+            getNow(),
+            NULL,
+        ]);
+        $this->logger->addInfo('Added radio from import with ID '.$radioId);
     }
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
@@ -285,10 +343,11 @@ $app->post('/import-radio', function (Request $request, Response $response) {
 
 $app->post('/delete-radio', function (Request $request, Response $response) {
     $parsedBody = $request->getParsedBody();
+    // The form in management-radio.phtml only sends `id`, never `radioId`.
+    $id = htmlspecialchars($parsedBody['id'] ?? '', ENT_QUOTES);
     $query = $this->db->prepare('DELETE FROM `radios` WHERE `id` = ?');
-    $query->execute([htmlspecialchars($parsedBody['id'], ENT_QUOTES)],
-    );
-    $this->logger->addInfo('Deleted radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
+    $query->execute([$id]);
+    $this->logger->addInfo('Deleted radio with ID '.$id);
 
     return $response->withHeader('Location', $this->router->pathFor('management-radio'));
 })->setName('delete-radio');

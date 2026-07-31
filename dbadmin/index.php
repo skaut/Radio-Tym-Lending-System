@@ -2,6 +2,13 @@
 
 declare(strict_types=1);
 
+// Same reason as in src/index.php: deprecation notices in the output would prevent
+// the WWW-Authenticate header from being sent, breaking Basic Auth.
+error_reporting(E_ALL & ~E_DEPRECATED);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ini_set('error_log', __DIR__ . '/../logs/php-error.log');
+
 use Dotenv\Dotenv;
 
 require __DIR__ . '/../vendor/autoload.php';

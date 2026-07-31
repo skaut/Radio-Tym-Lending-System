@@ -1,14 +1,25 @@
+# Never serve sensitive files: .env (admin password and API token), the database
+# including SQLite's temporary -journal/-wal/-shm files, logs and Composer files.
+<FilesMatch "(^\.env|\.(sql|sqlite|sqlite-journal|sqlite-wal|sqlite-shm|db|log)$|^composer\.(json|lock)$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        order deny,allow
+        deny from all
+    </IfModule>
+</FilesMatch>
+
 RewriteEngine On
+
 RewriteRule ^dbadmin/?$ dbadmin/index.php [QSA,L]
 RewriteRule ^$ src/index.php [QSA,L]
+
+# Serve existing files (CSS, JS) directly, send everything else to the application.
+# The conditions must sit immediately before the rule they belong to.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-
-# blacklist all sensitive extensions
-<Files ~ "\.(sql|sqlite|db|log)$">
-   order deny,allow
-   deny from all
-</Files>
-
-CGIPassAuth On
 RewriteRule ^ src/index.php [QSA,L]
+
+# Pass the Authorization header through to PHP, otherwise Basic Auth does not work.
+CGIPassAuth On
