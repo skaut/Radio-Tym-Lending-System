@@ -8,13 +8,11 @@
 		<h4><?= $r['radioId'] ?> - <?= $r['name'] ?> - <?= $r['last-borrower'] ?></h4>
 		<?php if ($r['status'] === 'lent'): ?>
 			<form method="POST" action="<?= $router->pathFor('fast-return'); ?>">
-				<?= csrfField() ?>
 				<input type="submit" value="Vrátit" class="pure-button">
 				<input type="hidden" name="radioId" value="<?= $r['radioId'] ?>">
 			</form>
 		<?php else: ?>
 			<form method="POST" action="<?= $router->pathFor('fast-lent'); ?>">
-				<?= csrfField() ?>
 				<input type="text" name="borrower" placeholder="třeba Šutr..." required="required">
 				<input type="submit" value="Vypůjčit" class="pure-button">
 				<input type="hidden" name="radioId" value="<?= $r['radioId'] ?>">
