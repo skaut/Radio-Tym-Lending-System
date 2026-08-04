@@ -292,7 +292,7 @@ $app->add(function (Request $request, Response $response, callable $next) use ($
 
     $container->get('logger')->addWarning(
         'Rejected request with missing or invalid CSRF token.',
-        ['action' => 'csrf-fail', 'path' => $path, 'method' => $request->getMethod()]
+        ['action' => 'csrf-fail', 'path' => htmlspecialchars($path, ENT_QUOTES), 'method' => $request->getMethod()]
     );
 
     if (isAsyncRequest($request)) {
@@ -328,9 +328,10 @@ $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
         // and logging those would just be noise.
         $user = $arguments['params']['user'] ?? null;
         if ($user !== null) {
+            $escapedUser = htmlspecialchars($user, ENT_QUOTES);
             $container->get('logger')->addWarning(
-                'Failed login attempt for user "'.$user.'".',
-                ['action' => 'auth-fail', 'user' => $user]
+                'Failed login attempt for user "'.$escapedUser.'".',
+                ['action' => 'auth-fail', 'user' => $escapedUser]
             );
         }
     },
@@ -541,12 +542,14 @@ $app->get('/log', function (Request $request, Response $response) {
     $level = $queryParams['level'] ?? '';
     $action = $queryParams['action'] ?? '';
 
+    $parsed = parseLogData($logData, $logLimit, $dateFrom, $dateTo, $level, $action);
+
     return $this->view->render($response, 'log.phtml', [
         'router' => $this->router,
-        'log' => parseLogLines($logData, $logLimit, $dateFrom, $dateTo, $level, $action),
+        'log' => $parsed['entries'],
         'logLimit' => $logLimit,
-        'logLevels' => getLogLevels($logData),
-        'logActions' => getLogActions($logData),
+        'logLevels' => $parsed['levels'],
+        'logActions' => $parsed['actions'],
         'dateFrom' => $dateFrom,
         'dateTo' => $dateTo,
         'level' => $level,
@@ -688,7 +691,7 @@ $app->post('/api/voice-command', function (Request $request, Response $response)
     $providedToken = $request->getHeaderLine('X-API-Token');
     $expectedToken = $_ENV['API_TOKEN'] ?? '';
 
-    if (empty($_ENV['API_TOKEN']) || $providedToken !== $expectedToken) {
+    if (empty($_ENV['API_TOKEN']) || !hash_equals($expectedToken, $providedToken)) {
         $this->logger->addWarning('Voice command: Neoprávněný přístup (špatný token).', ['action' => 'voice-auth-fail']);
         return jsonResponse($response, ['error' => 'Unauthorized'], 401);
     }

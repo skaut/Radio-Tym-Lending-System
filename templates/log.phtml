@@ -65,13 +65,13 @@
 			<tbody>
 			<?php foreach ($log as $entry): ?>
 				<tr class="log-row log-level-<?= strtolower($entry['level'] ?: 'unknown') ?>">
-					<td data-label="Datum" class="cell-date"><?= htmlspecialchars($entry['date'], ENT_QUOTES) ?></td>
-					<td data-label="Čas" class="cell-time"><?= htmlspecialchars($entry['time'], ENT_QUOTES) ?></td>
-					<td data-label="Úroveň" class="cell-level"><?= htmlspecialchars($entry['level'], ENT_QUOTES) ?></td>
-					<td data-label="Akce" class="cell-action"><?= htmlspecialchars($entry['action'], ENT_QUOTES) ?></td>
-					<td data-label="Radio ID" class="cell-radio-id"><?= htmlspecialchars($entry['radioId'], ENT_QUOTES) ?></td>
-					<td data-label="Podpis" class="cell-signature"><?= htmlspecialchars($entry['signature'], ENT_QUOTES) ?></td>
-					<td data-label="Zpráva" class="cell-message"><?= htmlspecialchars($entry['message'], ENT_QUOTES) ?></td>
+					<td data-label="Datum" class="cell-date"><?= $entry['date'] ?></td>
+					<td data-label="Čas" class="cell-time"><?= $entry['time'] ?></td>
+					<td data-label="Úroveň" class="cell-level"><?= $entry['level'] ?></td>
+					<td data-label="Akce" class="cell-action"><?= $entry['action'] ?></td>
+					<td data-label="Radio ID" class="cell-radio-id"><?= $entry['radioId'] ?></td>
+					<td data-label="Podpis" class="cell-signature"><?= $entry['signature'] ?></td>
+					<td data-label="Zpráva" class="cell-message"><?= $entry['message'] ?></td>
 				</tr>
 			<?php endforeach; ?>
 			</tbody>

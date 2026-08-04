@@ -29,10 +29,13 @@ function startAppSession(): void
         session_save_path(RTLS_SESSION_PATH);
     }
 
+    $requireHttps = filter_var($_ENV['AUTH_REQUIRE_HTTPS'] ?? 'false', FILTER_VALIDATE_BOOL);
+    $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+
     session_set_cookie_params([
         'httponly' => true,
         'samesite' => 'Lax',
-        'secure' => (($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off'),
+        'secure' => $requireHttps || $isHttps,
     ]);
     session_start();
 }
@@ -123,7 +126,10 @@ function basicAuthCredentialsMatch(string $expectedUser, string $expectedPass, ?
         return false;
     }
 
-    return hash_equals($expectedUser, $user) && hash_equals($expectedPass, $pass);
+    $userMatches = hash_equals($expectedUser, $user);
+    $passMatches = hash_equals($expectedPass, $pass);
+
+    return $userMatches && $passMatches;
 }
 
 function parseLogLine($line) {
@@ -158,43 +164,49 @@ function parseLogLine($line) {
     ];
 }
 
-function parseLogLines($rawLog, $limit, $dateFrom = null, $dateTo = null, $level = null, $action = null) {
+function parseLogData($rawLog, $limit, $dateFrom = null, $dateTo = null, $level = null, $action = null) {
     $lines = array_filter(explode(PHP_EOL, trim($rawLog)), fn($line) => $line !== '');
-    $entries = array_map('parseLogLine', $lines);
+    $entries = [];
+    $levels = [];
+    $actions = [];
 
-    if ($dateFrom) {
-        $entries = array_filter($entries, fn($e) => $e['date'] === '' || $e['date'] >= $dateFrom);
+    foreach ($lines as $line) {
+        $entry = parseLogLine($line);
+        $entries[] = $entry;
+
+        if ($entry['level'] !== '' && !in_array($entry['level'], $levels, true)) {
+            $levels[] = $entry['level'];
+        }
+        if ($entry['action'] !== '' && !in_array($entry['action'], $actions, true)) {
+            $actions[] = $entry['action'];
+        }
     }
-    if ($dateTo) {
-        $entries = array_filter($entries, fn($e) => $e['date'] === '' || $e['date'] <= $dateTo);
-    }
-    if ($level) {
-        $entries = array_filter($entries, fn($e) => $e['level'] === $level);
-    }
-    if ($action) {
-        $entries = array_filter($entries, fn($e) => $e['action'] === $action);
-    }
 
-    $entries = array_slice(array_values($entries), -$limit);
+    $filtered = array_filter($entries, function ($e) use ($dateFrom, $dateTo, $level, $action) {
+        if ($dateFrom && $e['date'] !== '' && $e['date'] < $dateFrom) {
+            return false;
+        }
+        if ($dateTo && $e['date'] !== '' && $e['date'] > $dateTo) {
+            return false;
+        }
+        if ($level && $e['level'] !== $level) {
+            return false;
+        }
+        if ($action && $e['action'] !== $action) {
+            return false;
+        }
+        return true;
+    });
 
-    return array_reverse($entries);
-}
-
-function getLogLevels($rawLog) {
-    preg_match_all('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] \S+\.(\w+):/m', $rawLog, $matches);
-
-    $levels = array_unique($matches[1]);
+    $filtered = array_slice(array_values($filtered), -$limit);
     sort($levels);
-
-    return $levels;
-}
-
-function getLogActions($rawLog) {
-    $lines = array_filter(explode(PHP_EOL, trim($rawLog)), fn($line) => $line !== '');
-    $actions = array_unique(array_filter(array_map(fn($line) => parseLogLine($line)['action'], $lines)));
     sort($actions);
 
-    return $actions;
+    return [
+        'entries' => array_reverse($filtered),
+        'levels' => $levels,
+        'actions' => $actions,
+    ];
 }
 
 function removeDiacritic($input) {

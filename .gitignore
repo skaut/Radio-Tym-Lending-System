@@ -8,14 +8,13 @@ vendor/
 
 # The live database holds real borrower names (personal data) and must never be
 # committed. The schema lives in src/schema.sql instead - the app creates the
-# database from it on first boot. The patterns are deliberately unanchored so
-# they also catch dated backups like `rtls.sqlite.backup-20260524`.
+# database from it on first boot. `rtls.sqlite*` catches the database itself,
+# SQLite's -journal/-wal/-shm siblings and any backup with an arbitrary suffix
+# (.backup-20260524, .bak, .old, .tmp, .copy, ...). `*.sqlite` and `*.db`
+# cover a renamed or copied database; `*.sql.backup-*` catches SQL dumps.
+rtls.sqlite*
 *.sqlite
-*.sqlite-journal
-*.sqlite-wal
-*.sqlite-shm
 *.db
-*.sqlite.backup-*
 *.sql.backup-*
 
 # Runtime logs and PHP sessions - logs/.gitkeep keeps the directory itself.
