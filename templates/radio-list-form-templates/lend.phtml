@@ -5,6 +5,7 @@
 		   autofocus
 		   <?php echo(empty($r['last-borrower']) ? 'required' : '') ?>
 	>
+	<?= csrfField() ?>
 	<input type="hidden" name="id" value="<?= $r['id'] ?>">
 	<input type="hidden" name="radioId" value="<?= $r['radioId'] ?>">
 	<input type="hidden" name="last-borrower" value="<?= $r['last-borrower'] ?>">

@@ -11,6 +11,7 @@
 		<section class="panel">
 		<h3>Přidat rádio</h3>
 		<form class="stacked-form" method="POST" action="<?= $router->pathFor('add-new-radio'); ?>">
+			<?= csrfField() ?>
 			<input type="text" id="radioId" name="radioId" placeholder="ID rádia" required>
 			<input type="text" id="name" name="name" placeholder="Název" required>
 			<input type="submit" class="pure-button pure-button-primary" value="Přidat radio">
@@ -20,6 +21,7 @@
 		<section class="panel">
 		<h3>Hromadný import</h3>
 		<form class="stacked-form" method="POST" action="<?= $router->pathFor('import-radio'); ?>">
+			<?= csrfField() ?>
 			<textarea name="importRadio" rows="5" cols="60">AA1;Baofeng
 AA2;Baofeng</textarea><br/>
 			<input type="submit" value="Importovat" class="pure-button">
@@ -45,6 +47,7 @@ AA2;Baofeng</textarea><br/>
 					<td data-label="Název" class="cell-name"><?= $r['name'] ?></td>
 					<td data-label="Akce" class="actions-cell">
 						<form method="POST" action="<?= $router->pathFor('delete-radio') ?>">
+							<?= csrfField() ?>
 							<input type="hidden" name="id" value="<?= $r['id'] ?>">
 							<input type="submit" class="pure-button" value="Smazat!">
 						</form>

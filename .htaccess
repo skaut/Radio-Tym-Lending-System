@@ -18,6 +18,12 @@
 
 RewriteEngine On
 
+# Block the whole logs/ directory. The FilesMatch rules above key off file
+# extensions, and PHP session files are named `sess_<id>` with no extension at
+# all - so without this, session files (and with them CSRF tokens) would be
+# downloadable by anyone who guessed a session id.
+RewriteRule ^logs/ - [F,L]
+
 RewriteRule ^dbadmin/?$ dbadmin/index.php [QSA,L]
 RewriteRule ^$ src/index.php [QSA,L]
 

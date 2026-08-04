@@ -49,6 +49,7 @@
 					<td data-label="Čas poslední akce" class="optional-mobile-column cell-last-action" data-sort-value="<?= htmlspecialchars($r['last-action-time'], ENT_QUOTES) ?>"><?= date_create($r['last-action-time'])->format('H:i:s d/m/y') ?></td>
 					<td data-label="Kanál" class="cell-channel">
 						<form class="action-form action-form-channel" method="POST" action="<?= $router->pathFor('update-channel'); ?>">
+							<?= csrfField() ?>
 							<select name="channel" required="required">
 								<!-- c<?= $r['channel'] ?> ch<?= $r['channel'] ?> channel<?= $r['channel'] ?> c:<?= $r['channel'] ?> ch:<?= $r['channel'] ?> channel:<?= $r['channel'] ?>-->
 								<?php foreach($channels as $channel): ?>
