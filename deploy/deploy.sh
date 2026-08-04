@@ -38,11 +38,9 @@ rsync -a --delete \
     --exclude '.env' \
     --filter 'P src/*.sqlite' \
     --filter 'P logs/rtls.log' \
-    --filter 'P logs/sessions/' \
-    --filter 'P logs/sessions/***' \
     "${SOURCE_DIR}/" "${TARGET_DIR}/"
 
-mkdir -p "${TARGET_DIR}/logs" "${TARGET_DIR}/logs/sessions" "${TARGET_DIR}/src"
+mkdir -p "${TARGET_DIR}/logs" "${TARGET_DIR}/src"
 
 if [[ -f "${TARGET_DIR}/src/rtls.sqlite" ]]; then
     chgrp "${APACHE_GROUP}" "${TARGET_DIR}/src/rtls.sqlite"
@@ -54,8 +52,8 @@ if [[ -f "${TARGET_DIR}/logs/rtls.log" ]]; then
     chmod 664 "${TARGET_DIR}/logs/rtls.log"
 fi
 
-chgrp "${APACHE_GROUP}" "${TARGET_DIR}/src" "${TARGET_DIR}/logs" "${TARGET_DIR}/logs/sessions"
-chmod 775 "${TARGET_DIR}/src" "${TARGET_DIR}/logs" "${TARGET_DIR}/logs/sessions"
+chgrp "${APACHE_GROUP}" "${TARGET_DIR}/src" "${TARGET_DIR}/logs"
+chmod 775 "${TARGET_DIR}/src" "${TARGET_DIR}/logs"
 
 if [[ "${RUN_CONFIGTEST}" == "1" && -x "${APACHECTL_BIN}" ]]; then
     "${APACHECTL_BIN}" configtest

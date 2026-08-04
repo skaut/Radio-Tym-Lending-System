@@ -1,11 +1,4 @@
 (function () {
-    function getCsrfToken() {
-        const meta = document.querySelector('meta[name="csrf-token"]');
-        return meta instanceof HTMLMetaElement ? meta.content : '';
-    }
-
-    window.rtlsGetCsrfToken = getCsrfToken;
-
     function focusFilterInput() {
         const filterInput = document.getElementById('inputFilter');
         if (filterInput instanceof HTMLInputElement) {
@@ -59,15 +52,10 @@
                 .replaceAll("'", '&#39;');
         }
 
-        function csrfInput() {
-            return '<input type="hidden" name="csrf_token" value="' + escapeHtml(getCsrfToken()) + '">';
-        }
-
         function renderActionForm(radio) {
             if (radio.nextAction === 'return') {
                 return '' +
                     '<form class="action-form" action="/radio-action/return" method="POST">' +
-                    csrfInput() +
                     '<input type="hidden" name="id" value="' + escapeHtml(String(radio.id)) + '">' +
                     '<input type="hidden" name="radioId" value="' + escapeHtml(radio.radioId) + '">' +
                     '<button type="button" class="pure-button js-async-submit" onclick="return window.rtlsAsyncSubmit(this.form)">Vrátit</button>' +
@@ -79,7 +67,6 @@
 
             return '' +
                 '<form class="action-form action-form-lend" action="/radio-action/lend" method="POST">' +
-                csrfInput() +
                 '<input type="text" name="borrower" placeholder="' + escapeHtml(placeholder) + '"' + required + '>' +
                 '<input type="hidden" name="id" value="' + escapeHtml(String(radio.id)) + '">' +
                 '<input type="hidden" name="radioId" value="' + escapeHtml(radio.radioId) + '">' +
@@ -148,9 +135,6 @@
         if (typeof window.rtlsGetSignature === 'function') {
             requestParams.set('signature', window.rtlsGetSignature());
         }
-        // Set from the meta tag rather than trusting the form to carry it, so a form
-        // rebuilt by an older render still posts the token the session expects.
-        requestParams.set('csrf_token', getCsrfToken());
         const requestBody = requestParams.toString();
         setBusy(true);
 
@@ -160,19 +144,12 @@
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': getCsrfToken()
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: requestBody
             });
 
             if (!response.ok) {
-                // A rejected token is worth reporting precisely - "reload the page"
-                // is actionable, the generic failure message is not.
-                if (response.status === 403) {
-                    const rejected = await response.json().catch(function () { return {}; });
-                    throw new Error(rejected.error || 'Neplatný bezpečnostní token. Načti stránku znovu.');
-                }
                 throw new Error('Server returned ' + response.status);
             }
 

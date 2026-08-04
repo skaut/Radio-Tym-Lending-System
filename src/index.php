@@ -27,14 +27,6 @@ $databasePath = __DIR__.'/rtls.sqlite';
 $logPath = $projectRoot.'/logs/rtls.log';
 $templatesPath = $projectRoot.'/templates/';
 
-// Session files live next to the logs so deploy.sh keeps them across deploys.
-// startAppSession() falls back to PHP's default path if this is not writable.
-define('RTLS_SESSION_PATH', $projectRoot.'/logs/sessions');
-if (!is_dir(RTLS_SESSION_PATH)) {
-    @mkdir(RTLS_SESSION_PATH, 0775, true);
-}
-
-
 // INSTALLATION CHECKS
 // Without these, both cases below end as a blank 500 with no explanation - and they
 // are by far the two most common mistakes after an FTP upload. Say what to fix instead.
@@ -259,56 +251,6 @@ $container['view'] = new \Slim\Views\PhpRenderer($templatesPath);
 
 
 // MIDDLEWARE
-// CSRF
-//
-// Added before the auth middleware on purpose: Slim 3 runs middleware last-added-first,
-// so authentication still happens before this check.
-//
-// Basic Auth credentials are cached and resent by the browser automatically, including
-// on form posts triggered by another site. Without a token, any page an operator visits
-// while logged in could silently delete a radio or flip its state.
-
-$app->add(function (Request $request, Response $response, callable $next) use ($container) {
-    if (!in_array($request->getMethod(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
-        return $next($request, $response);
-    }
-
-    // The voice API authenticates with X-API-Token and is called by a script that has
-    // no session and no browser-cached credentials, so CSRF does not apply to it.
-    $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
-    if (preg_match('#/api/voice-command/?$#', $path)) {
-        return $next($request, $response);
-    }
-
-    $parsedBody = $request->getParsedBody();
-    $submitted = is_array($parsedBody) ? ($parsedBody['csrf_token'] ?? null) : null;
-    if ($submitted === null || $submitted === '') {
-        $submitted = $request->getHeaderLine('X-CSRF-Token') ?: null;
-    }
-
-    if (csrfTokenMatches(is_string($submitted) ? $submitted : null)) {
-        return $next($request, $response);
-    }
-
-    $container->get('logger')->addWarning(
-        'Rejected request with missing or invalid CSRF token.',
-        ['action' => 'csrf-fail', 'path' => htmlspecialchars($path, ENT_QUOTES), 'method' => $request->getMethod()]
-    );
-
-    if (isAsyncRequest($request)) {
-        return jsonResponse($response, [
-            'success' => false,
-            'error' => 'Neplatný bezpečnostní token. Načti stránku znovu.',
-        ], 403);
-    }
-
-    $response->getBody()->write(
-        '<h1>Neplatný bezpečnostní token</h1>'
-        .'<p>Formulář vypršel nebo nepřišel z RTLS. Vrať se zpátky, načti stránku znovu (F5) a zkus to ještě jednou.</p>'
-    );
-
-    return $response->withStatus(403)->withHeader('Content-Type', 'text/html; charset=utf-8');
-});
 
 // AUTH
 
