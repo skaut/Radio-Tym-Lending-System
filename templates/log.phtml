@@ -1,14 +1,82 @@
 <?php require 'prefix.phtml' ?>
 
-	<h2>RTLS - Log událostí</h2>
+	<header class="page-header">
+		<h2>RTLS - Log událostí</h2>
+		<p class="page-subtitle">Posledních <?= $logLimit ?> záznamů, nejnovější nahoře. Výchozí filtr zobrazuje posledních 24 hodin.</p>
+	</header>
 
 <?php require 'main-menu.phtml' ?>
 
-	<article>
-		<h4>Log</h4>
-		<?php foreach ($log as $l) : ?>
-			<?= $l ?><br/>
-		<?php endforeach; ?>
+	<article class="content-section">
+		<script type="text/javascript" src="/public/log-filter.js?v=<?= filemtime(__DIR__.'/../public/log-filter.js') ?>"></script>
+		<script type="text/javascript" src="/public/sort.js?v=<?= filemtime(__DIR__.'/../public/sort.js') ?>"></script>
+		<form class="toolbar" method="GET" action="<?= $router->pathFor('log'); ?>">
+			<label class="filter-field" for="inputLogFilter">
+				<span>Filtrování logu</span>
+				<input autofocus="autofocus" id="inputLogFilter" type="text" placeholder="zkus ID vysílačky, jméno..." onkeyup="logFilterInput()" autocomplete="off" autocapitalize="off" spellcheck="false">
+			</label>
+			<label class="filter-field" for="inputDateFrom">
+				<span>Od data</span>
+				<input id="inputDateFrom" name="dateFrom" type="date" value="<?= htmlspecialchars($dateFrom, ENT_QUOTES) ?>">
+			</label>
+			<label class="filter-field" for="inputDateTo">
+				<span>Do data</span>
+				<input id="inputDateTo" name="dateTo" type="date" value="<?= htmlspecialchars($dateTo, ENT_QUOTES) ?>">
+			</label>
+			<?php if (count($logLevels) > 1): ?>
+				<label class="filter-field" for="inputLevel">
+					<span>Úroveň</span>
+					<select id="inputLevel" name="level">
+						<option value="">Vše</option>
+						<?php foreach ($logLevels as $l): ?>
+							<option value="<?= htmlspecialchars($l, ENT_QUOTES) ?>" <?php if ($level === $l) echo 'selected="selected"'; ?>><?= htmlspecialchars($l, ENT_QUOTES) ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+			<?php endif; ?>
+			<?php if (count($logActions) > 1): ?>
+				<label class="filter-field" for="inputAction">
+					<span>Akce</span>
+					<select id="inputAction" name="action">
+						<option value="">Vše</option>
+						<?php foreach ($logActions as $a): ?>
+							<option value="<?= htmlspecialchars($a, ENT_QUOTES) ?>" <?php if ($action === $a) echo 'selected="selected"'; ?>><?= htmlspecialchars($a, ENT_QUOTES) ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+			<?php endif; ?>
+			<button type="submit" class="pure-button">Filtrovat</button>
+			<a class="pure-button" href="<?= $router->pathFor('log'); ?>?dateFrom=&dateTo=&level=&action=">Zobrazit vše</a>
+		</form>
+		<div class="table-wrap">
+		<table id="logTable" class="table pure-table pure-table-striped radios-table">
+			<thead>
+			<tr>
+				<th data-sort-type="text" data-sort-target=".cell-date">Datum</th>
+				<th data-sort-type="text" data-sort-target=".cell-time">Čas</th>
+				<th data-sort-type="text" data-sort-target=".cell-level">Úroveň</th>
+				<th data-sort-type="text" data-sort-target=".cell-action">Akce</th>
+				<th data-sort-type="text" data-sort-target=".cell-radio-id">Radio ID</th>
+				<th data-sort-type="text" data-sort-target=".cell-signature">Podpis</th>
+				<th data-sort-type="text" data-sort-target=".cell-message">Zpráva</th>
+			</tr>
+			</thead>
+
+			<tbody>
+			<?php foreach ($log as $entry): ?>
+				<tr class="log-row log-level-<?= strtolower($entry['level'] ?: 'unknown') ?>">
+					<td data-label="Datum" class="cell-date"><?= $entry['date'] ?></td>
+					<td data-label="Čas" class="cell-time"><?= $entry['time'] ?></td>
+					<td data-label="Úroveň" class="cell-level"><?= $entry['level'] ?></td>
+					<td data-label="Akce" class="cell-action"><?= $entry['action'] ?></td>
+					<td data-label="Radio ID" class="cell-radio-id"><?= $entry['radioId'] ?></td>
+					<td data-label="Podpis" class="cell-signature"><?= $entry['signature'] ?></td>
+					<td data-label="Zpráva" class="cell-message"><?= $entry['message'] ?></td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+		</div>
 	</article>
 
 <?php require 'suffix.phtml' ?>

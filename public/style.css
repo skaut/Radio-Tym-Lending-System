@@ -62,6 +62,11 @@ button {
 
 .menu {
     width: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.3rem;
     border: 1px solid #1f1f1f;
     border-radius: 1rem;
     background: linear-gradient(135deg, #202020, #51453a);
@@ -73,6 +78,31 @@ button {
     flex-wrap: wrap;
     gap: 0.4rem;
     padding: 0.35rem;
+}
+
+.signature-widget {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    color: #f5f1ea;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.signature-widget input {
+    width: 9rem;
+    min-height: 1.9rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid #6b5c48;
+    border-radius: 0.75rem;
+    background: #2c2c2c;
+    color: #f9f4ee;
+}
+
+.signature-widget input:focus {
+    outline: none;
+    border-color: #f0e6d8;
 }
 
 .pure-menu-item {
@@ -131,6 +161,7 @@ button {
 }
 
 .filter-field input,
+.filter-field select,
 .stacked-form input[type="text"],
 .stacked-form textarea,
 td form input[type="text"],
@@ -221,6 +252,32 @@ td form select {
     text-align: left;
     white-space: nowrap;
     font-size: 0.88rem;
+}
+
+.radios-table th.sortable-column {
+    cursor: pointer;
+    user-select: none;
+}
+
+.radios-table th.sortable-column:hover {
+    background: #e3d4bc;
+}
+
+.radios-table th.sortable-column::after {
+    content: '\2195';
+    display: inline-block;
+    margin-left: 0.3rem;
+    opacity: 0.4;
+}
+
+.radios-table th.sortable-column.sorted-asc::after {
+    content: '\2191';
+    opacity: 1;
+}
+
+.radios-table th.sortable-column.sorted-desc::after {
+    content: '\2193';
+    opacity: 1;
 }
 
 .pure-table td {
@@ -318,6 +375,16 @@ td form {
     .app-menu-list {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .signature-widget {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .signature-widget input {
+        width: auto;
+        flex: 1 1 auto;
     }
 
     .pure-menu-link {

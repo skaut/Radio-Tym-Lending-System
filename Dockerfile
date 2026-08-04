@@ -10,10 +10,6 @@ RUN apt-get update \
 	git \
 	unzip
 
-RUN docker-php-ext-install \
-  pdo \
-  pdo_sqlite
-
 # Refresh apache2
 RUN a2enmod rewrite
 

@@ -1,4 +1,5 @@
 <form class="action-form" action="<?= $router->pathFor('radio-action', ['action' => 'return']) ?>" method="POST">
+	<?= csrfField() ?>
 	<input type="hidden" name="id" value="<?= $r['id'] ?>">
 	<input type="hidden" name="radioId" value="<?= $r['radioId'] ?>">
 	<button type="button" class="pure-button js-async-submit" onclick="return window.rtlsAsyncSubmit(this.form)">Vrátit</button>

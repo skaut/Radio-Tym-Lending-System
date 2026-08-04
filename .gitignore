@@ -1,5 +1,28 @@
-vendor/*
-.idea/*
-logs/*
-src/*.sqlite
+# Credentials - AUTH_USER, AUTH_PASS and API_TOKEN live here.
 .env
+
+# Composer dependencies. Built locally with
+# `composer install --no-dev --optimize-autoloader` and uploaded by FTP,
+# or installed on the server - either way, never committed.
+vendor/
+
+# The live database holds real borrower names (personal data) and must never be
+# committed. The schema lives in src/schema.sql instead - the app creates the
+# database from it on first boot. `rtls.sqlite*` catches the database itself,
+# SQLite's -journal/-wal/-shm siblings and any backup with an arbitrary suffix
+# (.backup-20260524, .bak, .old, .tmp, .copy, ...). `*.sqlite` and `*.db`
+# cover a renamed or copied database; `*.sql.backup-*` catches SQL dumps.
+rtls.sqlite*
+*.sqlite
+*.db
+*.sql.backup-*
+
+# Runtime logs and PHP sessions - logs/.gitkeep keeps the directory itself.
+logs/*
+!logs/.gitkeep
+
+# Editors / OS noise
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

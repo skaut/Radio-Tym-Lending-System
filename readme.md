@@ -24,6 +24,27 @@ Nastavit permissions `src/rtls.sqlite` a `logs/rtls.log` writable pro uživatele
 Zkopírovat `.env.example` na `.env` a vyplnit `AUTH_USER` / `AUTH_PASS`. Bez `.env` se aplikace
 nespustí a vypíše, co chybí.
 
+## Lokální běh přes Docker
+
+`$ docker-compose up -d`
+
+Repo se mountuje do kontejneru jako volume, takže `vendor/` musí existovat i na hostu. Pokud
+hostitelský PHP nemá verzi 8.4 (`composer install` na hostu selže na `Root composer.json requires
+php ^8.4`), spusť Composer rovnou v kontejneru, který má správnou verzi PHP:
+
+`$ docker compose exec app composer install`
+
+Kontejner běží jako `www-data`, ale bind-mount zachovává vlastníka souborů z hosta - pokud UID
+hostitelského uživatele neodpovídá `www-data` (uid 33) v kontejneru, `775`/`664` z FTP návodu výše
+nestačí (`www-data` spadá do "other", ne do vlastnící skupiny). Pro lokální Docker vývoj je
+nejjednodušší nastavit:
+
+`$ chmod 777 src logs && chmod 666 src/rtls.sqlite logs/rtls.log`
+
+`docker-compose.yml` mapuje porty `80` i `443`, ale kontejner neterminuje TLS - navštívit
+`http://localhost/` (ne `https://`), jinak prohlížeč skončí na chybě handshake
+(`PR_END_OF_FILE_ERROR` ve Firefoxu).
+
 ## Nasazení na sdílený hosting přes FTP
 
 Hosting nemá Composer, takže se nahrává i složka `vendor/`. Postup:

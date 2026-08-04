@@ -27,6 +27,13 @@ $databasePath = __DIR__.'/rtls.sqlite';
 $logPath = $projectRoot.'/logs/rtls.log';
 $templatesPath = $projectRoot.'/templates/';
 
+// Session files live next to the logs so deploy.sh keeps them across deploys.
+// startAppSession() falls back to PHP's default path if this is not writable.
+define('RTLS_SESSION_PATH', $projectRoot.'/logs/sessions');
+if (!is_dir(RTLS_SESSION_PATH)) {
+    @mkdir(RTLS_SESSION_PATH, 0775, true);
+}
+
 
 // INSTALLATION CHECKS
 // Without these, both cases below end as a blank 500 with no explanation - and they
@@ -49,7 +56,18 @@ if (!is_readable($projectRoot.'/.env')) {
     );
 }
 
-if (!is_writable($databasePath) || !is_writable(dirname($databasePath))) {
+// The database file is not in git (it holds real borrower names), so on a fresh
+// install it simply is not there yet. That is fine - it gets created from
+// src/schema.sql on the first connection, as long as the directory is writable.
+if (!file_exists($databasePath)) {
+    if (!is_writable(dirname($databasePath))) {
+        installationError(
+            'Databázi nejde vytvořit',
+            'Soubor <code>src/rtls.sqlite</code> zatím neexistuje a složka <code>src/</code> není zapisovatelná. '
+            .'Nastav přes FTP složce <code>src/</code> práva <code>775</code> - databáze se pak vytvoří sama.'
+        );
+    }
+} elseif (!is_writable($databasePath) || !is_writable(dirname($databasePath))) {
     installationError(
         'Databáze není zapisovatelná',
         'Nastav přes FTP práva <code>664</code> souboru <code>src/rtls.sqlite</code> a práva <code>775</code> složce <code>src/</code>. '
@@ -70,28 +88,27 @@ if (!is_writable($logPath) || !is_writable(dirname($logPath))) {
 $dotenv = Dotenv\Dotenv::createImmutable($projectRoot);
 $dotenv->load();
 
+// Refuse to start without credentials rather than booting an unprotected admin.
+// Everything behind Basic Auth - the radio list, management, /log, /dbadmin - would
+// otherwise be wide open, and nothing on the page would say so.
+if (($_ENV['AUTH_USER'] ?? '') === '' || ($_ENV['AUTH_PASS'] ?? '') === '') {
+    installationError(
+        'Chybí přihlašovací údaje',
+        'V souboru <code>.env</code> musí být vyplněné <code>AUTH_USER</code> i <code>AUTH_PASS</code>. '
+        .'Bez nich by byla celá administrace přístupná komukoliv, takže se aplikace radši nespustí.'
+    );
+}
+
 function hasValidBasicAuthCredentials(): bool
 {
-    $expectedUser = $_ENV['AUTH_USER'] ?? '';
-    $expectedPass = $_ENV['AUTH_PASS'] ?? '';
-    $providedUser = $_SERVER['PHP_AUTH_USER'] ?? null;
-    $providedPass = $_SERVER['PHP_AUTH_PW'] ?? null;
+    $credentials = readBasicAuthCredentials();
 
-    // Pokud hosting smaže proměnné, přečteme si přihlášení přímo z hlavičky prohlížeče
-    if ($providedUser === null) {
-        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
-        if (stripos($authHeader, 'basic ') === 0) {
-            $credentials = explode(':', base64_decode(substr($authHeader, 6)), 2);
-            if (count($credentials) === 2) {
-                $providedUser = $credentials[0];
-                $providedPass = $credentials[1];
-            }
-        }
-    }
-
-    return $expectedUser !== ''
-        && $providedUser === $expectedUser
-        && $providedPass === $expectedPass;
+    return basicAuthCredentialsMatch(
+        $_ENV['AUTH_USER'] ?? '',
+        $_ENV['AUTH_PASS'] ?? '',
+        $credentials['user'],
+        $credentials['pass']
+    );
 }
 
 function isAsyncRequest(Request $request): bool
@@ -133,7 +150,7 @@ function normalizeRadioState(PDO $db, Monolog\Logger $logger, array $radio): arr
     if (isChargingComplete($radio)) {
         $query = $db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `id` = ?');
         $query->execute([$radio['id']]);
-        $logger->addInfo('Radio with ID '.$radio['radioId'].' is set as charged and ready.');
+        $logger->addInfo('Radio with ID '.$radio['radioId'].' is set as charged and ready.', ['action' => 'auto-ready', 'radioId' => $radio['radioId']]);
         $radio['status'] = 'ready';
     }
 
@@ -222,7 +239,13 @@ $container['db'] = function ($c) {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
+    // Fresh install: PDO just created an empty file, so lay down the schema.
     $columns = $pdo->query('PRAGMA table_info(`radios`)')->fetchAll();
+    if ($columns === []) {
+        $pdo->exec(file_get_contents(__DIR__.'/schema.sql'));
+        $columns = $pdo->query('PRAGMA table_info(`radios`)')->fetchAll();
+    }
+
     $columnNames = array_column($columns, 'name');
 
     if (!in_array('channel', $columnNames, true)) {
@@ -236,38 +259,116 @@ $container['view'] = new \Slim\Views\PhpRenderer($templatesPath);
 
 
 // MIDDLEWARE
+// CSRF
+//
+// Added before the auth middleware on purpose: Slim 3 runs middleware last-added-first,
+// so authentication still happens before this check.
+//
+// Basic Auth credentials are cached and resent by the browser automatically, including
+// on form posts triggered by another site. Without a token, any page an operator visits
+// while logged in could silently delete a radio or flip its state.
+
+$app->add(function (Request $request, Response $response, callable $next) use ($container) {
+    if (!in_array($request->getMethod(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        return $next($request, $response);
+    }
+
+    // The voice API authenticates with X-API-Token and is called by a script that has
+    // no session and no browser-cached credentials, so CSRF does not apply to it.
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
+    if (preg_match('#/api/voice-command/?$#', $path)) {
+        return $next($request, $response);
+    }
+
+    $parsedBody = $request->getParsedBody();
+    $submitted = is_array($parsedBody) ? ($parsedBody['csrf_token'] ?? null) : null;
+    if ($submitted === null || $submitted === '') {
+        $submitted = $request->getHeaderLine('X-CSRF-Token') ?: null;
+    }
+
+    if (csrfTokenMatches(is_string($submitted) ? $submitted : null)) {
+        return $next($request, $response);
+    }
+
+    $container->get('logger')->addWarning(
+        'Rejected request with missing or invalid CSRF token.',
+        ['action' => 'csrf-fail', 'path' => htmlspecialchars($path, ENT_QUOTES), 'method' => $request->getMethod()]
+    );
+
+    if (isAsyncRequest($request)) {
+        return jsonResponse($response, [
+            'success' => false,
+            'error' => 'Neplatný bezpečnostní token. Načti stránku znovu.',
+        ], 403);
+    }
+
+    $response->getBody()->write(
+        '<h1>Neplatný bezpečnostní token</h1>'
+        .'<p>Formulář vypršel nebo nepřišel z RTLS. Vrať se zpátky, načti stránku znovu (F5) a zkus to ještě jednou.</p>'
+    );
+
+    return $response->withStatus(403)->withHeader('Content-Type', 'text/html; charset=utf-8');
+});
+
 // AUTH
 
+// Basic Auth sends the password on every request, so over plain HTTP it is readable
+// by anyone on the network. Hosts without TLS still exist, so this defaults to the
+// current behaviour (off) rather than locking anyone out - but turn it on wherever
+// HTTPS is available. localhost stays exempt so local development keeps working.
+$requireHttps = filter_var($_ENV['AUTH_REQUIRE_HTTPS'] ?? 'false', FILTER_VALIDATE_BOOL);
+
 $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
-    'secure' => false,
+    'secure' => $requireHttps,
+    'relaxed' => ['localhost', '127.0.0.1', '::1'],
+    'error' => function ($response, $arguments) use ($container) {
+        // Only log attempts where credentials were actually submitted - every
+        // first, credential-less request to a protected page also lands here
+        // (the browser retries with Basic Auth only after the 401 challenge),
+        // and logging those would just be noise.
+        $user = $arguments['params']['user'] ?? null;
+        if ($user !== null) {
+            $escapedUser = htmlspecialchars($user, ENT_QUOTES);
+            $container->get('logger')->addWarning(
+                'Failed login attempt for user "'.$escapedUser.'".',
+                ['action' => 'auth-fail', 'user' => $escapedUser]
+            );
+        }
+    },
     'rules' => [
         new class implements \Tuupola\Middleware\HttpBasicAuthentication\RuleInterface {
             public function __invoke(\Psr\Http\Message\ServerRequestInterface $request): bool {
-                // Tady si vezmeme syrovou adresu přímo od prohlížeče (např. /src/B2)
+                // Read the raw URL straight from the browser (e.g. /src/B2) - Slim's own
+                // path can be rewritten by the hosting before it gets here.
                 $uri = $_SERVER['REQUEST_URI'] ?? '';
-                $path = parse_url($uri, PHP_URL_PATH);
+                $path = parse_url($uri, PHP_URL_PATH) ?? '';
 
-                // 1. Odemknout /src/ID (Když toto naskenuje host, projde to a PHP ho přesměruje)
+                // 1. QR-code entry point. Scanning it must work for guests; the route
+                //    itself decides where to send them.
                 if (preg_match('#/src/[a-zA-Z0-9_-]+/?$#', $path)) {
                     return false;
                 }
-                
-                // 2. Odemknout /public/ID (Sem je host přesměrován a uvidí šablonu)
+
+                // 2. Public status page a guest lands on after scanning.
                 if (preg_match('#/public/[a-zA-Z0-9_-]+/?$#', $path)) {
                     return false;
                 }
 
-                // 3. Odemknout statické soubory (aby se mohlo načíst tvoje CSS a JS do public stránky)
+                // 3. Static assets, so CSS and JS load on the public page.
                 if (preg_match('#\.(css|js|ico|png|jpg|svg)$#i', $path)) {
                     return false;
                 }
 
-                // 4. Odemknout API pro tvůj Python skript
-                if (str_starts_with($path, '/api/')) {
+                // 4. The voice-assistant endpoint, which authenticates itself with
+                //    X-API-Token. Whitelisted by exact path, NOT as the whole /api/
+                //    prefix: a prefix rule silently publishes every future /api route,
+                //    and a new endpoint added without its own token check would be
+                //    unauthenticated with nothing to hint at it.
+                if (preg_match('#/api/voice-command/?$#', $path)) {
                     return false;
                 }
 
-                // Všechno ostatní natvrdo ZAMKNOUT (hlavní administrace, /log, atd.)
+                // Everything else requires authentication.
                 return true;
             }
         }
@@ -278,10 +379,6 @@ $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
 ]));
 
 // ROUTES
-
-$app->get('/phpinfo', function (Request $request, Response $response) {
-    return $response->getBody()->write(phpinfo());
-});
 
 $app->get('/management-radio', function (Request $request, Response $response) {
     $query = $this->db->query('SELECT `id`,`radioId`, `name` FROM `radios` ORDER BY `radioId` ASC, `name` ASC');
@@ -305,7 +402,7 @@ $app->post('/add-new-radio', function (Request $request, Response $response) {
             NULL,
         ]
     );
-    $this->logger->addInfo('Added radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
+    $this->logger->addInfo('Added radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES), ['action' => 'add', 'radioId' => htmlspecialchars($parsedBody['radioId'], ENT_QUOTES)]);
     
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('add-new-radio');
@@ -335,7 +432,7 @@ $app->post('/import-radio', function (Request $request, Response $response) {
             getNow(),
             NULL,
         ]);
-        $this->logger->addInfo('Added radio from import with ID '.$radioId);
+        $this->logger->addInfo('Added radio from import with ID '.$radioId, ['action' => 'import', 'radioId' => $radioId]);
     }
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
@@ -347,7 +444,7 @@ $app->post('/delete-radio', function (Request $request, Response $response) {
     $id = htmlspecialchars($parsedBody['id'] ?? '', ENT_QUOTES);
     $query = $this->db->prepare('DELETE FROM `radios` WHERE `id` = ?');
     $query->execute([$id]);
-    $this->logger->addInfo('Deleted radio with ID '.$id);
+    $this->logger->addInfo('Deleted radio with ID '.$id, ['action' => 'delete', 'radioId' => $id]);
 
     return $response->withHeader('Location', $this->router->pathFor('management-radio'));
 })->setName('delete-radio');
@@ -360,7 +457,7 @@ $app->post('/update-channel', function (Request $request, Response $response) {
             htmlspecialchars($parsedBody['radioId'], ENT_QUOTES),
         ]
     );
-    $this->logger->addInfo('Changed channel for radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
+    $this->logger->addInfo('Changed channel for radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES), ['action' => 'channel', 'radioId' => htmlspecialchars($parsedBody['radioId'], ENT_QUOTES)]);
 
     if (isAsyncRequest($request)) {
         $radio = fetchRadioByColumn($this->db, $this->logger, 'id', htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
@@ -381,6 +478,7 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
     $parsedBody = $request->getParsedBody();
     $id = htmlspecialchars($parsedBody['id'], ENT_QUOTES);
     $radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
+    $signature = getSignatureFromRequest($parsedBody);
 
     switch ($argumentAction) {
         case 'lend':
@@ -391,19 +489,20 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
             }
             $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ?, `last-borrower` = ? WHERE `id` = ?');
             $query->execute(['lent', getNow(), $borrower, $id]);
-            $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.');
+            $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.' by '.$signature.'.', ['action' => 'lend', 'radioId' => $radioId, 'borrower' => $borrower, 'signature' => $signature]);
             break;
         case 'return':
             $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ? WHERE `id` = ?');
             $query->execute(['charging', getNow(), $id]);
-            $this->logger->addInfo('Radio with ID '.$radioId.' is returned.');
+            $this->logger->addInfo('Radio with ID '.$radioId.' is returned by '.$signature.'.', ['action' => 'return', 'radioId' => $radioId, 'signature' => $signature]);
             break;
         case 'charged':
             $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ? WHERE `id` = ?');
             $query->execute(['ready', getNow(), $id]);
-            $this->logger->addInfo('Radio with ID '.$radioId.' is set as fully charged.');
+            $this->logger->addInfo('Radio with ID '.$radioId.' is set as fully charged.', ['action' => 'charge-complete', 'radioId' => $radioId]);
             break;
         default:
+            $this->logger->addWarning('Unknown radio-action "'.$argumentAction.'" for radio with ID '.$radioId.'.', ['action' => 'unknown-action', 'radioId' => $radioId]);
             throw new Exception('Unknown radio-action argument');
     }
 
@@ -428,17 +527,46 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
 })->setName('radio-action');
 
 $app->get('/log', function (Request $request, Response $response) {
+    $logLimit = 500;
     $logData = file_get_contents($this->settings['logPath']);
-    
-    return $this->view->render($response, 'log.phtml', ['router' => $this->router, 'log' => explode(PHP_EOL, $logData)]);
+    $queryParams = $request->getQueryParams();
+
+    if (!isset($queryParams['dateFrom']) && !isset($queryParams['dateTo'])) {
+        $now = new DateTime('now', new DateTimeZone('Europe/Prague'));
+        $dateTo = $now->format('Y-m-d');
+        $dateFrom = $now->modify('-24 hours')->format('Y-m-d');
+    } else {
+        $dateFrom = $queryParams['dateFrom'] ?? '';
+        $dateTo = $queryParams['dateTo'] ?? '';
+    }
+    $level = $queryParams['level'] ?? '';
+    $action = $queryParams['action'] ?? '';
+
+    $parsed = parseLogData($logData, $logLimit, $dateFrom, $dateTo, $level, $action);
+
+    return $this->view->render($response, 'log.phtml', [
+        'router' => $this->router,
+        'log' => $parsed['entries'],
+        'logLimit' => $logLimit,
+        'logLevels' => $parsed['levels'],
+        'logActions' => $parsed['actions'],
+        'dateFrom' => $dateFrom,
+        'dateTo' => $dateTo,
+        'level' => $level,
+        'action' => $action,
+    ]);
 })->setName('log');
 
 $app->post('/fast-return', function (Request $request, Response $response) {
+    $parsedBody = $request->getParsedBody();
+    $radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
+    $signature = getSignatureFromRequest($parsedBody);
     $query = $this->db->prepare('UPDATE `radios` SET `status` = "ready", `last-action-time` = ? WHERE `radioId` = ?');
     $query->execute([
         getNow(),
-        $request->getParsedBody()['radioId'],
+        $radioId,
     ]);
+    $this->logger->addInfo('Radio with ID '.$radioId.' is fast-returned by '.$signature.'.', ['action' => 'fast-return', 'radioId' => $radioId, 'signature' => $signature]);
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('fast-return');
@@ -447,6 +575,7 @@ $app->post('/fast-lent', function (Request $request, Response $response) {
     $parsedBody = $request->getParsedBody();
     $radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
     $borrower = htmlspecialchars($parsedBody['borrower'], ENT_QUOTES);
+    $signature = getSignatureFromRequest($parsedBody);
 
     $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ?, `last-borrower` = ? WHERE `radioId` = ?');
     $query->execute([
@@ -455,7 +584,7 @@ $app->post('/fast-lent', function (Request $request, Response $response) {
         $borrower,
         $radioId,
     ]);
-    $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.');
+    $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.' by '.$signature.'.', ['action' => 'fast-lend', 'radioId' => $radioId, 'borrower' => $borrower, 'signature' => $signature]);
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('fast-lent');
@@ -562,8 +691,8 @@ $app->post('/api/voice-command', function (Request $request, Response $response)
     $providedToken = $request->getHeaderLine('X-API-Token');
     $expectedToken = $_ENV['API_TOKEN'] ?? '';
 
-    if (empty($_ENV['API_TOKEN']) || $providedToken !== $expectedToken) {
-        $this->logger->addWarning('Voice command: Neoprávněný přístup (špatný token).');
+    if (empty($_ENV['API_TOKEN']) || !hash_equals($expectedToken, $providedToken)) {
+        $this->logger->addWarning('Voice command: Neoprávněný přístup (špatný token).', ['action' => 'voice-auth-fail']);
         return jsonResponse($response, ['error' => 'Unauthorized'], 401);
     }
 
@@ -574,6 +703,7 @@ $app->post('/api/voice-command', function (Request $request, Response $response)
     $channel = trim(htmlspecialchars($parsedBody['kanal'] ?? '', ENT_QUOTES));
 
     if (empty($radioId) || empty($borrower) || empty($channel)) {
+        $this->logger->addWarning('Voice command: Chybí povinná data (radio_id/jmeno/kanal).', ['action' => 'voice-missing-data', 'radioId' => $radioId]);
         return jsonResponse($response, ['error' => 'Missing data'], 400);
     }
 
@@ -581,7 +711,7 @@ $app->post('/api/voice-command', function (Request $request, Response $response)
     $checkQuery = $this->db->prepare('SELECT `id` FROM `radios` WHERE `radioId` = ?');
     $checkQuery->execute([$radioId]);
     if (!$checkQuery->fetch()) {
-        $this->logger->addWarning('Voice command: Rádio s ID ' . $radioId . ' nebylo v databázi nalezeno.');
+        $this->logger->addWarning('Voice command: Rádio s ID ' . $radioId . ' nebylo v databázi nalezeno.', ['action' => 'voice-radio-not-found', 'radioId' => $radioId]);
         return jsonResponse($response, ['error' => 'Radio not found'], 404);
     }
 
@@ -596,7 +726,7 @@ $app->post('/api/voice-command', function (Request $request, Response $response)
     ]);
 
     // 5. Zapsání do logu a odpověď Pythonu
-    $this->logger->addInfo("Voice command: Rádio $radioId vypůjčeno pro $borrower na kanál $channel.");
+    $this->logger->addInfo("Voice command: Rádio $radioId vypůjčeno pro $borrower na kanál $channel.", ['action' => 'voice-lend', 'radioId' => $radioId, 'borrower' => $borrower, 'channel' => $channel]);
 
     return jsonResponse($response, [
         'success' => true,

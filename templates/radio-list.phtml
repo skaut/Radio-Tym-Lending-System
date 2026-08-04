@@ -10,6 +10,7 @@
 	<article class="content-section">
 		<script type="text/javascript" src="/public/filter.js?v=<?= filemtime(__DIR__.'/../public/filter.js') ?>"></script>
 		<script type="text/javascript" src="/public/async-actions.js?v=<?= filemtime(__DIR__.'/../public/async-actions.js') ?>"></script>
+		<script type="text/javascript" src="/public/sort.js?v=<?= filemtime(__DIR__.'/../public/sort.js') ?>"></script>
 		<div class="toolbar">
 			<label class="filter-field" for="inputFilter">
 				<span>Filtrování vysílaček</span>
@@ -25,12 +26,12 @@
 		<table id="mainTable" class="table pure-table pure-table-striped radios-table">
 			<thead>
 			<tr>
-				<th>Radio ID</th>
-				<th>Název</th>
-				<th>Stav</th>
-				<th class="optional-mobile-column">Čas poslední akce</th>
-				<th>Kanál</th>
-				<th>Poslední vypůjčitel</th>
+				<th data-sort-type="text" data-sort-target=".cell-radio-id">Radio ID</th>
+				<th data-sort-type="text" data-sort-target=".cell-name">Název</th>
+				<th data-sort-type="text" data-sort-target=".cell-status">Stav</th>
+				<th class="optional-mobile-column" data-sort-type="date" data-sort-target=".cell-last-action">Čas poslední akce</th>
+				<th data-sort-type="numeric" data-sort-target=".cell-channel select">Kanál</th>
+				<th data-sort-type="text" data-sort-target=".cell-borrower">Poslední vypůjčitel</th>
 				<th>Akce</th>
 			</tr>
 			</thead>
@@ -40,14 +41,15 @@
 				<tr id="radio-row_<?= $r['id'] ?>" class="radio-row <?php if ($r['status'] == 'lent') echo 'highlight'; else echo 'dimnish';?>" data-radio-id="<?= $r['id'] ?>" data-radio-code="<?= htmlspecialchars($r['radioId'], ENT_QUOTES) ?>">
 					<td data-label="Radio ID" class="cell-radio-id"><?= $r['radioId'] ?></td>
 					<td data-label="Název" class="cell-name"><?= $r['name'] ?></td>
-					<td data-label="Stav">
+					<td data-label="Stav" class="cell-status">
 						<div id="status_<?= $r['id'] ?>">
 							<?= $statusDictionary[$r['status']] ?>
 						</div>
 					</td>
-					<td data-label="Čas poslední akce" class="optional-mobile-column cell-last-action"><?= date_create($r['last-action-time'])->format('H:i:s d/m/y') ?></td>
+					<td data-label="Čas poslední akce" class="optional-mobile-column cell-last-action" data-sort-value="<?= htmlspecialchars($r['last-action-time'], ENT_QUOTES) ?>"><?= date_create($r['last-action-time'])->format('H:i:s d/m/y') ?></td>
 					<td data-label="Kanál" class="cell-channel">
 						<form class="action-form action-form-channel" method="POST" action="<?= $router->pathFor('update-channel'); ?>">
+							<?= csrfField() ?>
 							<select name="channel" required="required">
 								<!-- c<?= $r['channel'] ?> ch<?= $r['channel'] ?> channel<?= $r['channel'] ?> c:<?= $r['channel'] ?> ch:<?= $r['channel'] ?> channel:<?= $r['channel'] ?>-->
 								<?php foreach($channels as $channel): ?>
