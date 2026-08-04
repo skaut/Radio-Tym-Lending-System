@@ -131,6 +131,7 @@ button {
 }
 
 .filter-field input,
+.filter-field select,
 .stacked-form input[type="text"],
 .stacked-form textarea,
 td form input[type="text"],

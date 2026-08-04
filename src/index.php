@@ -133,7 +133,7 @@ function normalizeRadioState(PDO $db, Monolog\Logger $logger, array $radio): arr
     if (isChargingComplete($radio)) {
         $query = $db->prepare('UPDATE `radios` SET `status` = "ready" WHERE `id` = ?');
         $query->execute([$radio['id']]);
-        $logger->addInfo('Radio with ID '.$radio['radioId'].' is set as charged and ready.');
+        $logger->addInfo('Radio with ID '.$radio['radioId'].' is set as charged and ready.', ['action' => 'auto-ready', 'radioId' => $radio['radioId']]);
         $radio['status'] = 'ready';
     }
 
@@ -240,6 +240,19 @@ $container['view'] = new \Slim\Views\PhpRenderer($templatesPath);
 
 $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
     'secure' => false,
+    'error' => function ($response, $arguments) use ($container) {
+        // Only log attempts where credentials were actually submitted - every
+        // first, credential-less request to a protected page also lands here
+        // (the browser retries with Basic Auth only after the 401 challenge),
+        // and logging those would just be noise.
+        $user = $arguments['params']['user'] ?? null;
+        if ($user !== null) {
+            $container->get('logger')->addWarning(
+                'Failed login attempt for user "'.$user.'".',
+                ['action' => 'auth-fail', 'user' => $user]
+            );
+        }
+    },
     'rules' => [
         new class implements \Tuupola\Middleware\HttpBasicAuthentication\RuleInterface {
             public function __invoke(\Psr\Http\Message\ServerRequestInterface $request): bool {
@@ -305,7 +318,7 @@ $app->post('/add-new-radio', function (Request $request, Response $response) {
             NULL,
         ]
     );
-    $this->logger->addInfo('Added radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
+    $this->logger->addInfo('Added radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES), ['action' => 'add', 'radioId' => htmlspecialchars($parsedBody['radioId'], ENT_QUOTES)]);
     
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('add-new-radio');
@@ -335,7 +348,7 @@ $app->post('/import-radio', function (Request $request, Response $response) {
             getNow(),
             NULL,
         ]);
-        $this->logger->addInfo('Added radio from import with ID '.$radioId);
+        $this->logger->addInfo('Added radio from import with ID '.$radioId, ['action' => 'import', 'radioId' => $radioId]);
     }
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
@@ -347,7 +360,7 @@ $app->post('/delete-radio', function (Request $request, Response $response) {
     $id = htmlspecialchars($parsedBody['id'] ?? '', ENT_QUOTES);
     $query = $this->db->prepare('DELETE FROM `radios` WHERE `id` = ?');
     $query->execute([$id]);
-    $this->logger->addInfo('Deleted radio with ID '.$id);
+    $this->logger->addInfo('Deleted radio with ID '.$id, ['action' => 'delete', 'radioId' => $id]);
 
     return $response->withHeader('Location', $this->router->pathFor('management-radio'));
 })->setName('delete-radio');
@@ -360,7 +373,7 @@ $app->post('/update-channel', function (Request $request, Response $response) {
             htmlspecialchars($parsedBody['radioId'], ENT_QUOTES),
         ]
     );
-    $this->logger->addInfo('Changed channel for radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
+    $this->logger->addInfo('Changed channel for radio with ID '.htmlspecialchars($parsedBody['radioId'], ENT_QUOTES), ['action' => 'channel', 'radioId' => htmlspecialchars($parsedBody['radioId'], ENT_QUOTES)]);
 
     if (isAsyncRequest($request)) {
         $radio = fetchRadioByColumn($this->db, $this->logger, 'id', htmlspecialchars($parsedBody['radioId'], ENT_QUOTES));
@@ -391,19 +404,20 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
             }
             $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ?, `last-borrower` = ? WHERE `id` = ?');
             $query->execute(['lent', getNow(), $borrower, $id]);
-            $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.');
+            $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.', ['action' => 'lend', 'radioId' => $radioId, 'borrower' => $borrower]);
             break;
         case 'return':
             $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ? WHERE `id` = ?');
             $query->execute(['charging', getNow(), $id]);
-            $this->logger->addInfo('Radio with ID '.$radioId.' is returned.');
+            $this->logger->addInfo('Radio with ID '.$radioId.' is returned.', ['action' => 'return', 'radioId' => $radioId]);
             break;
         case 'charged':
             $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ? WHERE `id` = ?');
             $query->execute(['ready', getNow(), $id]);
-            $this->logger->addInfo('Radio with ID '.$radioId.' is set as fully charged.');
+            $this->logger->addInfo('Radio with ID '.$radioId.' is set as fully charged.', ['action' => 'charge-complete', 'radioId' => $radioId]);
             break;
         default:
+            $this->logger->addWarning('Unknown radio-action "'.$argumentAction.'" for radio with ID '.$radioId.'.', ['action' => 'unknown-action', 'radioId' => $radioId]);
             throw new Exception('Unknown radio-action argument');
     }
 
@@ -428,17 +442,42 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
 })->setName('radio-action');
 
 $app->get('/log', function (Request $request, Response $response) {
+    $logLimit = 500;
     $logData = file_get_contents($this->settings['logPath']);
-    
-    return $this->view->render($response, 'log.phtml', ['router' => $this->router, 'log' => explode(PHP_EOL, $logData)]);
+    $queryParams = $request->getQueryParams();
+
+    if (!isset($queryParams['dateFrom']) && !isset($queryParams['dateTo'])) {
+        $now = new DateTime('now', new DateTimeZone('Europe/Prague'));
+        $dateTo = $now->format('Y-m-d');
+        $dateFrom = $now->modify('-24 hours')->format('Y-m-d');
+    } else {
+        $dateFrom = $queryParams['dateFrom'] ?? '';
+        $dateTo = $queryParams['dateTo'] ?? '';
+    }
+    $level = $queryParams['level'] ?? '';
+    $action = $queryParams['action'] ?? '';
+
+    return $this->view->render($response, 'log.phtml', [
+        'router' => $this->router,
+        'log' => parseLogLines($logData, $logLimit, $dateFrom, $dateTo, $level, $action),
+        'logLimit' => $logLimit,
+        'logLevels' => getLogLevels($logData),
+        'logActions' => getLogActions($logData),
+        'dateFrom' => $dateFrom,
+        'dateTo' => $dateTo,
+        'level' => $level,
+        'action' => $action,
+    ]);
 })->setName('log');
 
 $app->post('/fast-return', function (Request $request, Response $response) {
+    $radioId = htmlspecialchars($request->getParsedBody()['radioId'], ENT_QUOTES);
     $query = $this->db->prepare('UPDATE `radios` SET `status` = "ready", `last-action-time` = ? WHERE `radioId` = ?');
     $query->execute([
         getNow(),
-        $request->getParsedBody()['radioId'],
+        $radioId,
     ]);
+    $this->logger->addInfo('Radio with ID '.$radioId.' is fast-returned.', ['action' => 'fast-return', 'radioId' => $radioId]);
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('fast-return');
@@ -455,7 +494,7 @@ $app->post('/fast-lent', function (Request $request, Response $response) {
         $borrower,
         $radioId,
     ]);
-    $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.');
+    $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.', ['action' => 'fast-lend', 'radioId' => $radioId, 'borrower' => $borrower]);
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('fast-lent');
@@ -563,7 +602,7 @@ $app->post('/api/voice-command', function (Request $request, Response $response)
     $expectedToken = $_ENV['API_TOKEN'] ?? '';
 
     if (empty($_ENV['API_TOKEN']) || $providedToken !== $expectedToken) {
-        $this->logger->addWarning('Voice command: Neoprávněný přístup (špatný token).');
+        $this->logger->addWarning('Voice command: Neoprávněný přístup (špatný token).', ['action' => 'voice-auth-fail']);
         return jsonResponse($response, ['error' => 'Unauthorized'], 401);
     }
 
@@ -574,6 +613,7 @@ $app->post('/api/voice-command', function (Request $request, Response $response)
     $channel = trim(htmlspecialchars($parsedBody['kanal'] ?? '', ENT_QUOTES));
 
     if (empty($radioId) || empty($borrower) || empty($channel)) {
+        $this->logger->addWarning('Voice command: Chybí povinná data (radio_id/jmeno/kanal).', ['action' => 'voice-missing-data', 'radioId' => $radioId]);
         return jsonResponse($response, ['error' => 'Missing data'], 400);
     }
 
@@ -581,7 +621,7 @@ $app->post('/api/voice-command', function (Request $request, Response $response)
     $checkQuery = $this->db->prepare('SELECT `id` FROM `radios` WHERE `radioId` = ?');
     $checkQuery->execute([$radioId]);
     if (!$checkQuery->fetch()) {
-        $this->logger->addWarning('Voice command: Rádio s ID ' . $radioId . ' nebylo v databázi nalezeno.');
+        $this->logger->addWarning('Voice command: Rádio s ID ' . $radioId . ' nebylo v databázi nalezeno.', ['action' => 'voice-radio-not-found', 'radioId' => $radioId]);
         return jsonResponse($response, ['error' => 'Radio not found'], 404);
     }
 
@@ -596,7 +636,7 @@ $app->post('/api/voice-command', function (Request $request, Response $response)
     ]);
 
     // 5. Zapsání do logu a odpověď Pythonu
-    $this->logger->addInfo("Voice command: Rádio $radioId vypůjčeno pro $borrower na kanál $channel.");
+    $this->logger->addInfo("Voice command: Rádio $radioId vypůjčeno pro $borrower na kanál $channel.", ['action' => 'voice-lend', 'radioId' => $radioId, 'borrower' => $borrower, 'channel' => $channel]);
 
     return jsonResponse($response, [
         'success' => true,
