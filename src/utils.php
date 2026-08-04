@@ -4,8 +4,12 @@ function getNow() {
     return (new DateTime('now', new DateTimeZone('Europe/Prague')))->format('Y-m-d H:i:s');
 }
 
+function getSignatureFromRequest($parsedBody) {
+    return htmlspecialchars(trim($parsedBody['signature'] ?? ''), ENT_QUOTES);
+}
+
 function parseLogLine($line) {
-    $empty = ['date' => '', 'time' => '', 'level' => '', 'message' => $line, 'action' => '', 'radioId' => ''];
+    $empty = ['date' => '', 'time' => '', 'level' => '', 'message' => $line, 'action' => '', 'radioId' => '', 'signature' => ''];
 
     if (!preg_match('/^\[(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\] \S+\.(\w+): (.*)$/s', $line, $header)) {
         return $empty;
@@ -32,6 +36,7 @@ function parseLogLine($line) {
         'message' => $body[1],
         'action' => (string)($context['action'] ?? ''),
         'radioId' => (string)($context['radioId'] ?? ''),
+        'signature' => (string)($context['signature'] ?? ''),
     ];
 }
 

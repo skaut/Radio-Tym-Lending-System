@@ -16,4 +16,9 @@
 			<a href="/dbadmin" class="pure-menu-link">DB Admin</a>
 		</li>
 	</ul>
+	<label class="signature-widget" for="inputSignature">
+		<span>Podpis</span>
+		<input type="text" id="inputSignature" placeholder="tvoje jméno" autocomplete="off" autocapitalize="words" spellcheck="false">
+	</label>
 </div>
+<script type="text/javascript" src="/public/signature.js?v=<?= filemtime(__DIR__.'/../public/signature.js') ?>"></script>

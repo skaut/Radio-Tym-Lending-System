@@ -131,7 +131,11 @@
             }
         }
 
-        const requestBody = new URLSearchParams(new FormData(form)).toString();
+        const requestParams = new URLSearchParams(new FormData(form));
+        if (typeof window.rtlsGetSignature === 'function') {
+            requestParams.set('signature', window.rtlsGetSignature());
+        }
+        const requestBody = requestParams.toString();
         setBusy(true);
 
         try {

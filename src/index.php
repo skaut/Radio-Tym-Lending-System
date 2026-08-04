@@ -394,6 +394,7 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
     $parsedBody = $request->getParsedBody();
     $id = htmlspecialchars($parsedBody['id'], ENT_QUOTES);
     $radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
+    $signature = getSignatureFromRequest($parsedBody);
 
     switch ($argumentAction) {
         case 'lend':
@@ -404,12 +405,12 @@ $app->post('/radio-action/{action}', function (Request $request, Response $respo
             }
             $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ?, `last-borrower` = ? WHERE `id` = ?');
             $query->execute(['lent', getNow(), $borrower, $id]);
-            $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.', ['action' => 'lend', 'radioId' => $radioId, 'borrower' => $borrower]);
+            $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.' by '.$signature.'.', ['action' => 'lend', 'radioId' => $radioId, 'borrower' => $borrower, 'signature' => $signature]);
             break;
         case 'return':
             $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ? WHERE `id` = ?');
             $query->execute(['charging', getNow(), $id]);
-            $this->logger->addInfo('Radio with ID '.$radioId.' is returned.', ['action' => 'return', 'radioId' => $radioId]);
+            $this->logger->addInfo('Radio with ID '.$radioId.' is returned by '.$signature.'.', ['action' => 'return', 'radioId' => $radioId, 'signature' => $signature]);
             break;
         case 'charged':
             $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ? WHERE `id` = ?');
@@ -471,13 +472,15 @@ $app->get('/log', function (Request $request, Response $response) {
 })->setName('log');
 
 $app->post('/fast-return', function (Request $request, Response $response) {
-    $radioId = htmlspecialchars($request->getParsedBody()['radioId'], ENT_QUOTES);
+    $parsedBody = $request->getParsedBody();
+    $radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
+    $signature = getSignatureFromRequest($parsedBody);
     $query = $this->db->prepare('UPDATE `radios` SET `status` = "ready", `last-action-time` = ? WHERE `radioId` = ?');
     $query->execute([
         getNow(),
         $radioId,
     ]);
-    $this->logger->addInfo('Radio with ID '.$radioId.' is fast-returned.', ['action' => 'fast-return', 'radioId' => $radioId]);
+    $this->logger->addInfo('Radio with ID '.$radioId.' is fast-returned by '.$signature.'.', ['action' => 'fast-return', 'radioId' => $radioId, 'signature' => $signature]);
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('fast-return');
@@ -486,6 +489,7 @@ $app->post('/fast-lent', function (Request $request, Response $response) {
     $parsedBody = $request->getParsedBody();
     $radioId = htmlspecialchars($parsedBody['radioId'], ENT_QUOTES);
     $borrower = htmlspecialchars($parsedBody['borrower'], ENT_QUOTES);
+    $signature = getSignatureFromRequest($parsedBody);
 
     $query = $this->db->prepare('UPDATE `radios` SET `status` = ?, `last-action-time` = ?, `last-borrower` = ? WHERE `radioId` = ?');
     $query->execute([
@@ -494,7 +498,7 @@ $app->post('/fast-lent', function (Request $request, Response $response) {
         $borrower,
         $radioId,
     ]);
-    $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.'.', ['action' => 'fast-lend', 'radioId' => $radioId, 'borrower' => $borrower]);
+    $this->logger->addInfo('Radio with ID '.$radioId.' is lent to '.$borrower.' by '.$signature.'.', ['action' => 'fast-lend', 'radioId' => $radioId, 'borrower' => $borrower, 'signature' => $signature]);
 
     return $response->withHeader('Location', $this->router->pathFor('radio-list'));
 })->setName('fast-lent');
