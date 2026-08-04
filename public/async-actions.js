@@ -109,6 +109,7 @@
 
             if (lastActionCell) {
                 lastActionCell.textContent = radio.lastActionTimeDisplay;
+                lastActionCell.setAttribute('data-sort-value', radio.lastActionTime);
             }
 
             if (borrowerCell) {

@@ -223,6 +223,32 @@ td form select {
     font-size: 0.88rem;
 }
 
+.radios-table th.sortable-column {
+    cursor: pointer;
+    user-select: none;
+}
+
+.radios-table th.sortable-column:hover {
+    background: #e3d4bc;
+}
+
+.radios-table th.sortable-column::after {
+    content: '\2195';
+    display: inline-block;
+    margin-left: 0.3rem;
+    opacity: 0.4;
+}
+
+.radios-table th.sortable-column.sorted-asc::after {
+    content: '\2191';
+    opacity: 1;
+}
+
+.radios-table th.sortable-column.sorted-desc::after {
+    content: '\2193';
+    opacity: 1;
+}
+
 .pure-table td {
     padding: 0.4rem 0.55rem;
     vertical-align: middle;

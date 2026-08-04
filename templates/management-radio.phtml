@@ -27,12 +27,13 @@ AA2;Baofeng</textarea><br/>
 		</section>
 		<section class="panel">
 		<h3>Mazání rádií</h3>
+		<script type="text/javascript" src="/public/sort.js?v=<?= filemtime(__DIR__.'/../public/sort.js') ?>"></script>
 		<div class="table-wrap">
 		<table id="mainTable" class="table pure-table pure-table-striped radios-table">
 			<thead>
 			<tr>
-				<th>Radio ID</th>
-				<th>Název</th>
+				<th data-sort-type="text" data-sort-target=".cell-radio-id">Radio ID</th>
+				<th data-sort-type="text" data-sort-target=".cell-name">Název</th>
 				<th>Akce</th>
 			</tr>
 			</thead>
@@ -40,8 +41,8 @@ AA2;Baofeng</textarea><br/>
 			<tbody>
 			<?php foreach ($radios as $r): ?>
 				<tr class="radio-row">
-					<td data-label="Radio ID"><?= $r['radioId'] ?></td>
-					<td data-label="Název"><?= $r['name'] ?></td>
+					<td data-label="Radio ID" class="cell-radio-id"><?= $r['radioId'] ?></td>
+					<td data-label="Název" class="cell-name"><?= $r['name'] ?></td>
 					<td data-label="Akce" class="actions-cell">
 						<form method="POST" action="<?= $router->pathFor('delete-radio') ?>">
 							<input type="hidden" name="id" value="<?= $r['id'] ?>">
