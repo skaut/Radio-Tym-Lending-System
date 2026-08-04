@@ -1,6 +1,12 @@
 # Never serve sensitive files: .env (admin password and API token), the database
 # including SQLite's temporary -journal/-wal/-shm files, logs and Composer files.
-<FilesMatch "(^\.env|\.(sql|sqlite|sqlite-journal|sqlite-wal|sqlite-shm|db|log)$|^composer\.(json|lock)$)">
+#
+# The database patterns are deliberately NOT anchored with `$`. An end-anchored
+# `\.sqlite$` misses anything with a suffix after it - `rtls.sqlite.backup-20260524`
+# was served as a plain static download, i.e. the whole database to anyone who
+# guessed the name. Matching the extension anywhere in the filename covers dated
+# backups, editor `.swp`/`~` leftovers and copies like `rtls.sqlite.old`.
+<FilesMatch "(^\.env|\.(sql|sqlite|db)($|[.-])|\.log($|[.-])|^composer\.(json|lock)$)">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>

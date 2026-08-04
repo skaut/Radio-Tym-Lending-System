@@ -49,7 +49,18 @@ if (!is_readable($projectRoot.'/.env')) {
     );
 }
 
-if (!is_writable($databasePath) || !is_writable(dirname($databasePath))) {
+// The database file is not in git (it holds real borrower names), so on a fresh
+// install it simply is not there yet. That is fine - it gets created from
+// src/schema.sql on the first connection, as long as the directory is writable.
+if (!file_exists($databasePath)) {
+    if (!is_writable(dirname($databasePath))) {
+        installationError(
+            'Databázi nejde vytvořit',
+            'Soubor <code>src/rtls.sqlite</code> zatím neexistuje a složka <code>src/</code> není zapisovatelná. '
+            .'Nastav přes FTP složce <code>src/</code> práva <code>775</code> - databáze se pak vytvoří sama.'
+        );
+    }
+} elseif (!is_writable($databasePath) || !is_writable(dirname($databasePath))) {
     installationError(
         'Databáze není zapisovatelná',
         'Nastav přes FTP práva <code>664</code> souboru <code>src/rtls.sqlite</code> a práva <code>775</code> složce <code>src/</code>. '
@@ -222,7 +233,13 @@ $container['db'] = function ($c) {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
+    // Fresh install: PDO just created an empty file, so lay down the schema.
     $columns = $pdo->query('PRAGMA table_info(`radios`)')->fetchAll();
+    if ($columns === []) {
+        $pdo->exec(file_get_contents(__DIR__.'/schema.sql'));
+        $columns = $pdo->query('PRAGMA table_info(`radios`)')->fetchAll();
+    }
+
     $columnNames = array_column($columns, 'name');
 
     if (!in_array('channel', $columnNames, true)) {
