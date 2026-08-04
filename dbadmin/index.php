@@ -12,6 +12,7 @@ ini_set('error_log', __DIR__ . '/../logs/php-error.log');
 use Dotenv\Dotenv;
 
 require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/../src/utils.php';
 
 $projectRoot = dirname(__DIR__);
 $sqlitePath = realpath($projectRoot . '/src/rtls.sqlite') ?: $projectRoot . '/src/rtls.sqlite';
@@ -23,13 +24,22 @@ $dotenv->safeLoad();
 $expectedUser = $_ENV['AUTH_USER'] ?? '';
 $expectedPass = $_ENV['AUTH_PASS'] ?? '';
 
-$providedUser = $_SERVER['PHP_AUTH_USER'] ?? null;
-$providedPass = $_SERVER['PHP_AUTH_PW'] ?? null;
+// Fail closed. The previous check was `$expectedUser !== '' && (...mismatch...)`,
+// which skipped authentication entirely when AUTH_USER was empty - and safeLoad()
+// swallows a missing or unreadable .env without a word, so a broken deploy handed
+// out full read/write Adminer access to the database instead of erroring.
+if ($expectedUser === '' || $expectedPass === '') {
+    header('HTTP/1.1 500 Internal Server Error');
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<h1>RTLS DB Admin</h1>';
+    echo '<p>V <code>.env</code> chybí <code>AUTH_USER</code> nebo <code>AUTH_PASS</code>. '
+        . 'Bez nich není co ověřit, takže je přístup zamčený.</p>';
+    exit;
+}
 
-if (
-    $expectedUser !== ''
-    && ($providedUser !== $expectedUser || $providedPass !== $expectedPass)
-) {
+$provided = readBasicAuthCredentials();
+
+if (!basicAuthCredentialsMatch($expectedUser, $expectedPass, $provided['user'], $provided['pass'])) {
     header('WWW-Authenticate: Basic realm="RTLS DB Admin"');
     header('HTTP/1.1 401 Unauthorized');
     echo 'Authentication required.';

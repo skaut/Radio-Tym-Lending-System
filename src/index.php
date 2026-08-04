@@ -81,28 +81,27 @@ if (!is_writable($logPath) || !is_writable(dirname($logPath))) {
 $dotenv = Dotenv\Dotenv::createImmutable($projectRoot);
 $dotenv->load();
 
+// Refuse to start without credentials rather than booting an unprotected admin.
+// Everything behind Basic Auth - the radio list, management, /log, /dbadmin - would
+// otherwise be wide open, and nothing on the page would say so.
+if (($_ENV['AUTH_USER'] ?? '') === '' || ($_ENV['AUTH_PASS'] ?? '') === '') {
+    installationError(
+        'Chybí přihlašovací údaje',
+        'V souboru <code>.env</code> musí být vyplněné <code>AUTH_USER</code> i <code>AUTH_PASS</code>. '
+        .'Bez nich by byla celá administrace přístupná komukoliv, takže se aplikace radši nespustí.'
+    );
+}
+
 function hasValidBasicAuthCredentials(): bool
 {
-    $expectedUser = $_ENV['AUTH_USER'] ?? '';
-    $expectedPass = $_ENV['AUTH_PASS'] ?? '';
-    $providedUser = $_SERVER['PHP_AUTH_USER'] ?? null;
-    $providedPass = $_SERVER['PHP_AUTH_PW'] ?? null;
+    $credentials = readBasicAuthCredentials();
 
-    // Pokud hosting smaže proměnné, přečteme si přihlášení přímo z hlavičky prohlížeče
-    if ($providedUser === null) {
-        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
-        if (stripos($authHeader, 'basic ') === 0) {
-            $credentials = explode(':', base64_decode(substr($authHeader, 6)), 2);
-            if (count($credentials) === 2) {
-                $providedUser = $credentials[0];
-                $providedPass = $credentials[1];
-            }
-        }
-    }
-
-    return $expectedUser !== ''
-        && $providedUser === $expectedUser
-        && $providedPass === $expectedPass;
+    return basicAuthCredentialsMatch(
+        $_ENV['AUTH_USER'] ?? '',
+        $_ENV['AUTH_PASS'] ?? '',
+        $credentials['user'],
+        $credentials['pass']
+    );
 }
 
 function isAsyncRequest(Request $request): bool
@@ -255,8 +254,15 @@ $container['view'] = new \Slim\Views\PhpRenderer($templatesPath);
 // MIDDLEWARE
 // AUTH
 
+// Basic Auth sends the password on every request, so over plain HTTP it is readable
+// by anyone on the network. Hosts without TLS still exist, so this defaults to the
+// current behaviour (off) rather than locking anyone out - but turn it on wherever
+// HTTPS is available. localhost stays exempt so local development keeps working.
+$requireHttps = filter_var($_ENV['AUTH_REQUIRE_HTTPS'] ?? 'false', FILTER_VALIDATE_BOOL);
+
 $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
-    'secure' => false,
+    'secure' => $requireHttps,
+    'relaxed' => ['localhost', '127.0.0.1', '::1'],
     'error' => function ($response, $arguments) use ($container) {
         // Only log attempts where credentials were actually submitted - every
         // first, credential-less request to a protected page also lands here
@@ -273,31 +279,37 @@ $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
     'rules' => [
         new class implements \Tuupola\Middleware\HttpBasicAuthentication\RuleInterface {
             public function __invoke(\Psr\Http\Message\ServerRequestInterface $request): bool {
-                // Tady si vezmeme syrovou adresu přímo od prohlížeče (např. /src/B2)
+                // Read the raw URL straight from the browser (e.g. /src/B2) - Slim's own
+                // path can be rewritten by the hosting before it gets here.
                 $uri = $_SERVER['REQUEST_URI'] ?? '';
-                $path = parse_url($uri, PHP_URL_PATH);
+                $path = parse_url($uri, PHP_URL_PATH) ?? '';
 
-                // 1. Odemknout /src/ID (Když toto naskenuje host, projde to a PHP ho přesměruje)
+                // 1. QR-code entry point. Scanning it must work for guests; the route
+                //    itself decides where to send them.
                 if (preg_match('#/src/[a-zA-Z0-9_-]+/?$#', $path)) {
                     return false;
                 }
-                
-                // 2. Odemknout /public/ID (Sem je host přesměrován a uvidí šablonu)
+
+                // 2. Public status page a guest lands on after scanning.
                 if (preg_match('#/public/[a-zA-Z0-9_-]+/?$#', $path)) {
                     return false;
                 }
 
-                // 3. Odemknout statické soubory (aby se mohlo načíst tvoje CSS a JS do public stránky)
+                // 3. Static assets, so CSS and JS load on the public page.
                 if (preg_match('#\.(css|js|ico|png|jpg|svg)$#i', $path)) {
                     return false;
                 }
 
-                // 4. Odemknout API pro tvůj Python skript
-                if (str_starts_with($path, '/api/')) {
+                // 4. The voice-assistant endpoint, which authenticates itself with
+                //    X-API-Token. Whitelisted by exact path, NOT as the whole /api/
+                //    prefix: a prefix rule silently publishes every future /api route,
+                //    and a new endpoint added without its own token check would be
+                //    unauthenticated with nothing to hint at it.
+                if (preg_match('#/api/voice-command/?$#', $path)) {
                     return false;
                 }
 
-                // Všechno ostatní natvrdo ZAMKNOUT (hlavní administrace, /log, atd.)
+                // Everything else requires authentication.
                 return true;
             }
         }
@@ -308,10 +320,6 @@ $app->add(new Tuupola\Middleware\HttpBasicAuthentication([
 ]));
 
 // ROUTES
-
-$app->get('/phpinfo', function (Request $request, Response $response) {
-    return $response->getBody()->write(phpinfo());
-});
 
 $app->get('/management-radio', function (Request $request, Response $response) {
     $query = $this->db->query('SELECT `id`,`radioId`, `name` FROM `radios` ORDER BY `radioId` ASC, `name` ASC');

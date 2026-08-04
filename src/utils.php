@@ -8,6 +8,53 @@ function getSignatureFromRequest($parsedBody) {
     return htmlspecialchars(trim($parsedBody['signature'] ?? ''), ENT_QUOTES);
 }
 
+/**
+ * Read the Basic Auth credentials the browser sent, as ['user' => ?string, 'pass' => ?string].
+ *
+ * Some hosts (Lebeda among them) never populate PHP_AUTH_USER/PHP_AUTH_PW, so fall
+ * back to decoding the raw Authorization header. Both the app and /dbadmin use this
+ * so the two cannot disagree about who is logged in.
+ */
+function readBasicAuthCredentials(): array
+{
+    $user = $_SERVER['PHP_AUTH_USER'] ?? null;
+    $pass = $_SERVER['PHP_AUTH_PW'] ?? null;
+
+    if ($user !== null) {
+        return ['user' => $user, 'pass' => (string)$pass];
+    }
+
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    if (stripos($authHeader, 'basic ') !== 0) {
+        return ['user' => null, 'pass' => null];
+    }
+
+    $decoded = base64_decode(substr($authHeader, 6), true);
+    if ($decoded === false || !str_contains($decoded, ':')) {
+        return ['user' => null, 'pass' => null];
+    }
+
+    [$user, $pass] = explode(':', $decoded, 2);
+
+    return ['user' => $user, 'pass' => $pass];
+}
+
+/**
+ * Compare submitted Basic Auth credentials against the expected pair.
+ *
+ * Fails closed: empty expected credentials never authenticate anything. Without that,
+ * a missing or unreadable .env silently turns into "everyone is an admin". Comparison
+ * is timing-safe.
+ */
+function basicAuthCredentialsMatch(string $expectedUser, string $expectedPass, ?string $user, ?string $pass): bool
+{
+    if ($expectedUser === '' || $expectedPass === '' || $user === null || $pass === null) {
+        return false;
+    }
+
+    return hash_equals($expectedUser, $user) && hash_equals($expectedPass, $pass);
+}
+
 function parseLogLine($line) {
     $empty = ['date' => '', 'time' => '', 'level' => '', 'message' => $line, 'action' => '', 'radioId' => '', 'signature' => ''];
 
